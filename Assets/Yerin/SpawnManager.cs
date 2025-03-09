@@ -1,11 +1,17 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class SpawnManager : MonoBehaviour
 {
     private int spawnedCount = 0;  // 생성된 아이템 개수
-    private int targetCount = 1000; // 기준 개수
+    private int targetCount = 100; // 기준 개수
 
     public static SpawnManager Instance { get; private set; }
+
+    [Header("UI Elements")]
+    public Image spawnFillImage;
+
 
     void Awake()
     {
@@ -19,19 +25,30 @@ public class SpawnManager : MonoBehaviour
         }
     }
 
+    void Start()
+    {
+        UpdateUI(); // 초기 UI 업데이트
+    }
+
+
     public void IncrementSpawnCount()
     {
         spawnedCount++;  // 아이템 개수 증가
-        DisplaySpawnPercentage();
+        UpdateUI();
     }
 
     public float GetSpawnPercentage()
     {
-        return (spawnedCount / (float)targetCount) * 100f;
+        return (spawnedCount / (float)targetCount);
     }
 
-    private void DisplaySpawnPercentage()
+    private void UpdateUI()
     {
-        Debug.Log($"생성된 아이템: {spawnedCount}/{targetCount} ({GetSpawnPercentage():F2}%)");
+        float percentage = GetSpawnPercentage(); 
+
+        if (spawnFillImage != null)
+        {
+            spawnFillImage.fillAmount = percentage; 
+        }
     }
 }
