@@ -33,6 +33,11 @@ public class Interactable : MonoBehaviour
     {
         outline.enabled = true;
     }
+
+    public void Destroy()
+    {
+        Destroy(gameObject);
+    }
     // Update is called once per frame
     void Update()
     {
