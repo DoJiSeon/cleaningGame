@@ -13,6 +13,10 @@ public class Player : MonoBehaviour
     public float jumpPower = 7f;
     public float gravity = 10f;
 
+    // 이속제한용 변수추가
+    public bool isSpeedLimited = false; // 이속 제한 여부
+    public float slowMultiplier = 0.3f; // 제한 시 속도 비율 (30%)
+
     public float lookSpeed = 2f;
     public float lookXLimit = 45f;
     private bool isCrouching = false;
@@ -52,13 +56,20 @@ public class Player : MonoBehaviour
 
         if (isCrouching)
         {
-            curSpeedX = crouchSpeed * Input.GetAxis("Vertical");
-            curSpeedY = crouchSpeed * Input.GetAxis("Horizontal");
+            float speed = crouchSpeed;
+            if (isSpeedLimited) speed *= slowMultiplier; // 앉을 때도 이속 제한 적용
+
+            curSpeedX = speed * Input.GetAxis("Vertical");
+            curSpeedY = speed * Input.GetAxis("Horizontal");
         }
         else
         {
-            curSpeedX = canMove ? (isRunning ? runSpeed : walkSpeed) * Input.GetAxis("Vertical") : 0;
-            curSpeedY = canMove ? (isRunning ? runSpeed : walkSpeed) * Input.GetAxis("Horizontal") : 0;
+            float speed = isRunning ? runSpeed : walkSpeed;
+
+            if (isSpeedLimited) speed *= slowMultiplier; // 이속 제한 적용
+
+            curSpeedX = canMove ? speed * Input.GetAxis("Vertical") : 0;
+            curSpeedY = canMove ? speed * Input.GetAxis("Horizontal") : 0;
         }
 
         float movementDirectionY = moveDirection.y;
@@ -117,6 +128,11 @@ public class Player : MonoBehaviour
         #endregion
 
     }
+    public void SetSpeedLimit(bool value)
+    {
+        isSpeedLimited = value;
+    }
+
     IEnumerator CrouchCameraAdjust(Vector3 from, Vector3 to)
     {
         float elapsedTime = 0f;

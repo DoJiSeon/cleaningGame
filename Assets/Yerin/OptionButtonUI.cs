@@ -1,6 +1,8 @@
+using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System.Collections;
 
 public class OptionButtonUI : MonoBehaviour
 { 
@@ -20,8 +22,13 @@ public class OptionButtonUI : MonoBehaviour
     private int currentIndex = -1; 
     private const int maxOptions = 4;
 
+    private Player player; // Player 참조
+
+    public Image tunnelVisionMask;
+
     void Start()
     {
+        player = FindObjectOfType<Player>(); // 씬에 있는 Player 자동 참조
         nextTriggerTime = interval; // 5분 뒤 첫 실행
         animator.speed = 0f;        // 처음엔 Animator 정지
     }
@@ -74,6 +81,30 @@ public class OptionButtonUI : MonoBehaviour
         if (hasTriggered) return;
         hasTriggered = true;
 
+        // 1번: 이속제한
+        if (currentIndex == 0 && player != null)
+        {
+            player.SetSpeedLimit(true); // 이속 제한 걸기
+            Debug.Log("이속 제한 ON");
+            StartCoroutine(ReleaseSpeedLimitAfterSeconds(5f)); // 5초 후 자동 해제
+        }
+
+        // 2번: 사운드 뮤트
+        else if (currentIndex == 1)
+        {
+            StartCoroutine(MuteSoundForSeconds(5f));
+        }
+
+        // 3번: 터널 비전효과
+        else if (currentIndex == 2)
+        {
+            if (tunnelVisionMask != null)
+            {
+                tunnelVisionMask.enabled = true;
+                Debug.Log("터널비전 ON");
+                StartCoroutine(DisableTunnelVisionAfterSeconds(5f));
+            }
+        }
         animator.SetTrigger("Click Trigger");
         Debug.Log("SlideOut 발동");
     }
@@ -87,8 +118,39 @@ public class OptionButtonUI : MonoBehaviour
 
         animator.speed = 1f; // Animator 재생
         animator.ResetTrigger("Click Trigger");
+
+        // ★ HoverState 초기화 추가
+        animator.SetInteger("HoverState", -1); // 애니메이터도 0 또는 -1로 초기화
+
         animator.SetTrigger("SlideInTrigger");
 
         Debug.Log("SlideIn 반복 실행");
+    }
+
+    IEnumerator ReleaseSpeedLimitAfterSeconds(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        if (player != null)
+        {
+            player.SetSpeedLimit(false); // 제한 해제
+            Debug.Log("이속 제한 OFF");
+        }
+    }
+    IEnumerator MuteSoundForSeconds(float seconds)
+    {
+        AudioListener.volume = 0f;
+        Debug.Log("사운드 OFF");
+        yield return new WaitForSeconds(seconds);
+        AudioListener.volume = 1f;
+        Debug.Log("사운드 ON");
+    }
+    IEnumerator DisableTunnelVisionAfterSeconds(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        if (tunnelVisionMask != null)
+        {
+            tunnelVisionMask.enabled = false;
+            Debug.Log("터널비전 OFF");
+        }
     }
 }
