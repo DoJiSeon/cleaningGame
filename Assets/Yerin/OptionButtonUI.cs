@@ -100,6 +100,7 @@ public class OptionButtonUI : MonoBehaviour
         {
             if (tunnelVisionMask != null)
             {
+                tunnelVisionMask.gameObject.SetActive(true);
                 tunnelVisionMask.enabled = true;
                 Debug.Log("터널비전 ON");
                 StartCoroutine(DisableTunnelVisionAfterSeconds(5f));
@@ -150,6 +151,7 @@ public class OptionButtonUI : MonoBehaviour
         if (tunnelVisionMask != null)
         {
             tunnelVisionMask.enabled = false;
+            tunnelVisionMask.gameObject.SetActive(false);
             Debug.Log("터널비전 OFF");
         }
     }
