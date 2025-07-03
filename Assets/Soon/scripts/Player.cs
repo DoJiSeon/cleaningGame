@@ -13,9 +13,9 @@ public class Player : MonoBehaviour
     public float jumpPower = 7f;
     public float gravity = 10f;
 
-    // ÀÌ¼ÓÁ¦ÇÑ¿ë º¯¼öÃß°¡
-    public bool isSpeedLimited = false; // ÀÌ¼Ó Á¦ÇÑ ¿©ºÎ
-    public float slowMultiplier = 0.3f; // Á¦ÇÑ ½Ã ¼Óµµ ºñÀ² (30%)
+    // ï¿½Ì¼ï¿½ï¿½ï¿½ï¿½Ñ¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ß°ï¿½
+    public bool isSpeedLimited = false; // ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    public float slowMultiplier = 0.3f; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Óµï¿½ ï¿½ï¿½ï¿½ï¿½ (30%)
 
     public float lookSpeed = 2f;
     public float lookXLimit = 45f;
@@ -43,11 +43,12 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.E))
+        if (Input.GetKeyDown(KeyCode.R))
         {
-            characterAnimator.SetTrigger("cleanTrigger");
+           // characterAnimator.SetTrigger("cleanTrigger");
         }
 
+  
         #region Handles Movement
         Vector3 forward = transform.TransformDirection(Vector3.forward);
         Vector3 right = transform.TransformDirection(Vector3.right);
@@ -57,7 +58,7 @@ public class Player : MonoBehaviour
         if (isCrouching)
         {
             float speed = crouchSpeed;
-            if (isSpeedLimited) speed *= slowMultiplier; // ¾ÉÀ» ¶§µµ ÀÌ¼Ó Á¦ÇÑ Àû¿ë
+            if (isSpeedLimited) speed *= slowMultiplier; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
             curSpeedX = speed * Input.GetAxis("Vertical");
             curSpeedY = speed * Input.GetAxis("Horizontal");
@@ -66,7 +67,7 @@ public class Player : MonoBehaviour
         {
             float speed = isRunning ? runSpeed : walkSpeed;
 
-            if (isSpeedLimited) speed *= slowMultiplier; // ÀÌ¼Ó Á¦ÇÑ Àû¿ë
+            if (isSpeedLimited) speed *= slowMultiplier; // ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
             curSpeedX = canMove ? speed * Input.GetAxis("Vertical") : 0;
             curSpeedY = canMove ? speed * Input.GetAxis("Horizontal") : 0;
@@ -98,11 +99,11 @@ public class Player : MonoBehaviour
 
         #endregion
 
-        #region Handles Crouching (Ctrl Å°¸¦ ´­·¯¼­ Åä±Û)
+        #region Handles Crouching (Ctrl Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
         if (Input.GetKeyDown(KeyCode.LeftControl))
         {
-            isCrouching = !isCrouching; //  Åä±Û ¹æ½Ä
-            characterAnimator.SetBool("isCrouching", isCrouching); // ¾Ö´Ï¸ÞÀÌ¼Ç »óÅÂ º¯°æ
+            isCrouching = !isCrouching; //  ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+            characterAnimator.SetBool("isCrouching", isCrouching); // ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             if (isCrouching)
             {              
                 StartCoroutine(CrouchCameraAdjust(playerCamera.transform.localPosition, new Vector3(originalCameraPosition.x, crouchCameraHeight, originalCameraPosition.z))); // 
@@ -136,7 +137,7 @@ public class Player : MonoBehaviour
     IEnumerator CrouchCameraAdjust(Vector3 from, Vector3 to)
     {
         float elapsedTime = 0f;
-        float duration = 0.2f; // ºÎµå·´°Ô ÀÌµ¿ÇÏ´Â ½Ã°£
+        float duration = 0.2f; // ï¿½Îµå·´ï¿½ï¿½ ï¿½Ìµï¿½ï¿½Ï´ï¿½ ï¿½Ã°ï¿½
 
         while (elapsedTime < duration)
         {

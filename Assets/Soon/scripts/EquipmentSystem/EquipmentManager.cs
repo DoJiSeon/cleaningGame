@@ -29,6 +29,10 @@ public class EquipmentManager : MonoBehaviour
     private int currentIndex = 0;
     private GameObject currentEquipmentInstance;
 
+    public GameObject trashPrefab;          // 생성할 쓰레기 프리팹
+    public float trashSpawnDistance = 2f;   // 히트가 없을 때 카메라 앞까지의 거리
+    public LayerMask groundMask;            // 레이캐스트가 맞아야 하는 레이어(예: Ground)
+
     void Start()
     {
         // �÷��̾� ���ҿ� ���� ��� ����Ʈ ����
@@ -75,7 +79,42 @@ public class EquipmentManager : MonoBehaviour
                 equipmentScript.Interact();
             }
         }
+
+        if (playerRole == PlayerRole.Imposter && currentIndex == 2)
+        {
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                SpawnTrash();
+            }
+
+        }
     }
+
+    void SpawnTrash()
+    {
+        Camera cam = Camera.main;
+        Vector3 spawnPos;
+
+        // 카메라 정면으로 레이캐스트
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit hit;
+        if (Physics.Raycast(ray, out hit, 5f, groundMask))
+        {
+            // 땅이나 맞은 지점에 배치
+            spawnPos = hit.point;
+        }
+        else
+        {
+            // 맞은 지점이 없으면 카메라 앞 고정 거리
+            spawnPos = cam.transform.position + cam.transform.forward * trashSpawnDistance;
+        }
+
+        // 약간 위로 올려서 땅에 파묻히지 않도록
+        spawnPos.y += 0.05f;
+
+        Instantiate(trashPrefab, spawnPos, Quaternion.identity);
+    }
+
 
     void EquipItem(int index)
     {

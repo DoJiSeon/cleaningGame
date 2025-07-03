@@ -12,6 +12,7 @@ public class Interactable : MonoBehaviour
 
     public UnityEvent onIntercation;
 
+    public Renderer MyRenderer;
     void Start()
     {
         outline = GetComponent<Outline>();
@@ -38,7 +39,27 @@ public class Interactable : MonoBehaviour
     {
         Destroy(gameObject);
     }
-    // Update is called once per frame
+
+    public void FadeDestroy()
+    {
+        StartCoroutine(FadeOut());
+
+    }
+
+    IEnumerator FadeOut()
+    {
+        float f = 1;
+        while (f > 0)
+        {
+            f -= 0.1f;
+            Color ColorAlhpa = MyRenderer.material.color;
+            ColorAlhpa.a = f;
+            MyRenderer.material.color = ColorAlhpa;
+            yield return new WaitForSeconds(0.02f);
+        }
+        Destroy(gameObject);
+    }
+
     void Update()
     {
         
