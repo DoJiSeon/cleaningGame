@@ -43,11 +43,6 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-           // characterAnimator.SetTrigger("cleanTrigger");
-        }
-
   
         #region Handles Movement
         Vector3 forward = transform.TransformDirection(Vector3.forward);
@@ -99,20 +94,20 @@ public class Player : MonoBehaviour
 
         #endregion
 
-        #region Handles Crouching (Ctrl Ű�� ������ ���)
-        if (Input.GetKeyDown(KeyCode.LeftControl))
-        {
-            isCrouching = !isCrouching; //  ��� ���
-            characterAnimator.SetBool("isCrouching", isCrouching); // �ִϸ��̼� ���� ����
-            if (isCrouching)
-            {              
-                StartCoroutine(CrouchCameraAdjust(playerCamera.transform.localPosition, new Vector3(originalCameraPosition.x, crouchCameraHeight, originalCameraPosition.z))); // 
-            }
-            else
-            {
-                StartCoroutine(CrouchCameraAdjust(playerCamera.transform.localPosition, originalCameraPosition)); // 
-            }
-        }
+        #region Handles Crouching
+        //if (Input.GetKeyDown(KeyCode.LeftControl))
+        //{
+        //    isCrouching = !isCrouching; //  ��� ���
+        //    characterAnimator.SetBool("isCrouching", isCrouching); // �ִϸ��̼� ���� ����
+        //    if (isCrouching)
+        //    {              
+        //        StartCoroutine(CrouchCameraAdjust(playerCamera.transform.localPosition, new Vector3(originalCameraPosition.x, crouchCameraHeight, originalCameraPosition.z))); // 
+        //    }
+        //    else
+        //    {
+        //        StartCoroutine(CrouchCameraAdjust(playerCamera.transform.localPosition, originalCameraPosition)); // 
+        //    }
+        //}
         #endregion
 
         #region Handles Rotation
@@ -134,18 +129,18 @@ public class Player : MonoBehaviour
         isSpeedLimited = value;
     }
 
-    IEnumerator CrouchCameraAdjust(Vector3 from, Vector3 to)
-    {
-        float elapsedTime = 0f;
-        float duration = 0.2f; // �ε巴�� �̵��ϴ� �ð�
+    //IEnumerator CrouchCameraAdjust(Vector3 from, Vector3 to)
+    //{
+    //    float elapsedTime = 0f;
+    //    float duration = 0.2f; // �ε巴�� �̵��ϴ� �ð�
 
-        while (elapsedTime < duration)
-        {
-            playerCamera.transform.localPosition = Vector3.Lerp(from, to, elapsedTime / duration);
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
+    //    while (elapsedTime < duration)
+    //    {
+    //        playerCamera.transform.localPosition = Vector3.Lerp(from, to, elapsedTime / duration);
+    //        elapsedTime += Time.deltaTime;
+    //        yield return null;
+    //    }
 
-        playerCamera.transform.localPosition = to;
-    }
+    //    playerCamera.transform.localPosition = to;
+    //}
 }

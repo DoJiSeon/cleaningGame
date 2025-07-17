@@ -17,7 +17,7 @@ public class HUDController : MonoBehaviour
     // Start is called before the first frame update
     public void EnableInteractionText(string text)
     {
-        interactionText.text = text + " (F)";
+        interactionText.text = text + " (R)";
         interactionText.gameObject.SetActive(true);
     }
 
