@@ -22,7 +22,8 @@ public class PlayerInteraction : MonoBehaviour
         RaycastHit hit;
         Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
 
-        if (Physics.Raycast(ray, out hit, playerReach))
+        float sphereRadius = 0.5f;  // 감지 반경(조절 가능)
+        if (Physics.SphereCast(ray, sphereRadius, out hit, playerReach))
         {
             if (hit.collider.tag == "Interactable")
             {
