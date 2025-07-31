@@ -17,7 +17,6 @@ public class Interactable : MonoBehaviour
     {
         outline = GetComponent<Outline>();
         DisableOutline();
-        
     }
 
     public void Interact()
@@ -27,7 +26,8 @@ public class Interactable : MonoBehaviour
 
     public void DisableOutline()
     {
-        outline.enabled = false;
+        if (outline != null)
+            outline.enabled = false;
     }
 
     public void EnableOutline()
@@ -52,7 +52,7 @@ public class Interactable : MonoBehaviour
         float f = 1;
         while (f > 0)
         {
-            f -= 0.1f;
+            f -= 0.02f;
             Color ColorAlhpa = MyRenderer.material.color;
             ColorAlhpa.a = f;
             MyRenderer.material.color = ColorAlhpa;
