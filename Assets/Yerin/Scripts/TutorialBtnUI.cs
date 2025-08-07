@@ -4,66 +4,103 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Collections;
 using DG.Tweening;
+using System.Collections.Generic;
 
-public class OptionButtonUI : MonoBehaviour
-{ 
-    public Image timerBar; 
-    public float timeLimit = 20f; // SlideOut까지 남은 시간
-  
+public class TutorialBtnUI : MonoBehaviour
+{
+    public Image timerBar;
+    public float timeLimit = 10f; // SlideOut까지 남은 시간
     private float playTimer = 0f;
     [SerializeField]
-    public float interval = 300f; // interval - 10*n 마다 반복 (n = 0,1,...)
-    private float nextTriggerTime = 300f;
-
     public RectTransform slideTarget; // 애니메이션 대상
     public float slideInY = 0f;       // 최종 위치
     public float slideOutY = -300f;   // 초기 위치
     public float slideDuration = 0.5f;
 
+    [Header("Hover 버튼들")]
+
+    public List<Image> buttonImages;         // 각 버튼의 Image 컴포넌트
+    public Color normalColor = Color.white;  // 기본 색상
+    public Color highlightColor = new Color(1f, 0.8f, 0.3f, 1f); // 강조 색상 (노란 계열 추천)
+    public float colorTweenDuration = 0.2f;
+
+    private HashSet<int> selectedIndices = new HashSet<int>();
+    public int totalOptions = 4; // hover 가능한 전체 옵션 수
 
     private float timer;
     private bool hasAppeared = false;
     private bool hasTriggered = false;
 
-    private int currentIndex = -1; 
+    private int currentIndex = -1;
     private const int maxOptions = 4;
 
-    private Player player; // Player 참조
+    // 참조
+    private Player player; 
+    public TutorialManager tutorialManager;
+
 
     public Image tunnelVisionMask;
 
     void Start()
     {
-        player = FindObjectOfType<Player>(); // 씬에 있는 Player 자동 참조
-        nextTriggerTime = interval; // 5분 뒤 첫 실행
+        player = FindObjectOfType<Player>();
+        tutorialManager = FindObjectOfType<TutorialManager>();
+
     }
+
 
     void Update()
     {
         // 게임 플레이 타이머
         playTimer += Time.deltaTime;
 
-        // 매 interval(5분)마다 SlideIn 실행
-        if (playTimer >= nextTriggerTime)
-        {
-            ResetUIAndSlideIn(); // 슬라이드 인 실행
-            nextTriggerTime += interval; // 다음 트리거 시점 갱신
-        }
-
         if (!hasAppeared) return;
 
-      
+
         // K 키: Hover 상태 순환
         if (Input.GetKeyDown(KeyCode.K))
         {
-            currentIndex = (currentIndex + 1) % maxOptions;
-            Debug.Log($"Hover 상태: {currentIndex}");
+            // 이전 버튼 색상 복원
+            if (currentIndex >= 0 && currentIndex < buttonImages.Count)
+            {
+                buttonImages[currentIndex]
+                    .DOColor(normalColor, colorTweenDuration)
+                    .SetEase(Ease.OutQuad);
+            }
+
+            // 인덱스 순환
+            currentIndex = (currentIndex + 1) % buttonImages.Count;
+            Debug.Log($"[TutorialBtnUI] Hover 상태: {currentIndex}");
+
+            // 현재 버튼 강조 색상
+            if (currentIndex >= 0 && currentIndex < buttonImages.Count)
+            {
+                buttonImages[currentIndex]
+                    .DOColor(highlightColor, colorTweenDuration)
+                    .SetEase(Ease.OutBack);
+            }
         }
 
         // Enter 키: 현재 상태 클릭 처리
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            TriggerSlideOut();
+            if (currentIndex >= 0 && currentIndex < totalOptions)
+            {
+                selectedIndices.Add(currentIndex); // 선택 기록
+                Debug.Log($"선택된 Hover: {string.Join(", ", selectedIndices)}");
+
+                TriggerSlideOut();
+            }
+
+            // 모든 항목 선택 완료되었는지 확인
+            if (selectedIndices.Count >= totalOptions)
+            {
+                Debug.Log("[TutorialBtnUI] 모든 Hover 선택 완료");
+                if (tutorialManager != null)
+                {
+                    tutorialManager.NextStep();
+                }
+            }
         }
 
         // 자동 SlideOut 타이머
@@ -113,22 +150,40 @@ public class OptionButtonUI : MonoBehaviour
 
         SlideOut();
         Debug.Log("SlideOut 발동");
+
+        if (selectedIndices.Count < totalOptions)
+        {
+            StartCoroutine(ReopenAfterSeconds(1.5f)); // 애니메이션 끝나고 다시 열기
+        }
+
     }
 
-    void ResetUIAndSlideIn()
+    public void ResetUIAndSlideIn()
     {
         timer = timeLimit;
         hasTriggered = false;
         hasAppeared = true;
         currentIndex = -1;
 
-        if (slideTarget != null)
+        // 버튼 색상 초기화
+        for (int i = 0; i < buttonImages.Count; i++)
         {
-            slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY); // 시작 위치
-            slideTarget.DOAnchorPosY(slideInY, slideDuration).SetEase(Ease.OutBack);
+            buttonImages[i].color = normalColor;
         }
 
-        Debug.Log("SlideIn 반복 실행");
+        if (slideTarget != null)
+        {
+
+            slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY); // 시작 위치
+
+            slideTarget.DOAnchorPosY(slideInY, slideDuration)
+                .SetEase(Ease.OutBack)
+                .OnComplete(() =>
+                {
+                    Debug.Log("[TutorialBtnUI] 슬라이드 인 완료");
+                });
+        }
+
     }
 
     void SlideOut()
@@ -137,6 +192,8 @@ public class OptionButtonUI : MonoBehaviour
         {
             slideTarget.DOAnchorPosY(slideOutY, slideDuration).SetEase(Ease.InBack);
         }
+
+
     }
 
     IEnumerator ReleaseSpeedLimitAfterSeconds(float seconds)
@@ -166,4 +223,11 @@ public class OptionButtonUI : MonoBehaviour
             Debug.Log("터널비전 OFF");
         }
     }
+    IEnumerator ReopenAfterSeconds(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        hasTriggered = false; // 다시 선택 가능하게
+        ResetUIAndSlideIn();  // 다시 SlideIn
+    }
+
 }
