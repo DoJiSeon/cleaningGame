@@ -1,119 +1,104 @@
-// using Photon.Realtime;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 using DG.Tweening;
 
 public class OptionButtonUI : MonoBehaviour
-{ 
-    public Image timerBar; 
-    public float timeLimit = 20f; // SlideOut까지 남은 시간
-  
-    private float playTimer = 0f;
-    [SerializeField]
-    public float interval = 300f; // interval - 10*n 마다 반복 (n = 0,1,...)
-    private float nextTriggerTime = 300f;
+{
+    [Header("타이머")]
+    public Image timerBar;
+    public float timeLimit = 20f;   // 슬라이드 아웃까지 남은 시간
 
-    public RectTransform slideTarget; // 애니메이션 대상
-    public float slideInY = 0f;       // 최종 위치
-    public float slideOutY = -300f;   // 초기 위치
-    public float slideDuration = 0.5f;
+    [Header("패널 슬라이드")]
+    public RectTransform slideTarget;
+    public float slideInY = 0f;
+    public float slideOutY = -300f;
+    public float slideDur = 0.5f;
 
+    [Header("패널 표시 간격")]
+    public float interval = 300f;      // 5분
+    private float playTimer, nextTriggerTime;
 
-    private float timer;
-    private bool hasAppeared = false;
-    private bool hasTriggered = false;
+    [Header("버튼 하이라이트")]
+    public List<Image> buttonImages;                // Hover 대상들
+    public Color normalColor = Color.white;
+    public Color highlightColor = new Color(1f, 0.8f, 0.3f, 1f);
+    public float colorTweenDur = 0.2f;
+    public int totalOptions = 4;              // 선택해야 할 옵션 수
 
-    private int currentIndex = -1; 
-    private const int maxOptions = 4;
-
-    private Player player; // Player 참조
-
+    [Header("패널티 기능")]
     public Image tunnelVisionMask;
+    private Player player;
+
+    // 내부 상태
+    float timer;
+    bool hasAppeared, hasTriggered;
+    int currentIndex = -1;
+    HashSet<int> selected = new HashSet<int>();
 
     void Start()
     {
-        player = FindObjectOfType<Player>(); // 씬에 있는 Player 자동 참조
-        nextTriggerTime = interval; // 5분 뒤 첫 실행
+        player = FindObjectOfType<Player>();
+        nextTriggerTime = interval;                 // 5분 뒤 첫 표시
     }
 
     void Update()
     {
-        // 게임 플레이 타이머
+        // --- 패널 표시 주기 ---
         playTimer += Time.deltaTime;
-
-        // 매 interval(5분)마다 SlideIn 실행
         if (playTimer >= nextTriggerTime)
         {
-            ResetUIAndSlideIn(); // 슬라이드 인 실행
-            nextTriggerTime += interval; // 다음 트리거 시점 갱신
+            ResetUIAndSlideIn();
+            nextTriggerTime += interval;
         }
-
         if (!hasAppeared) return;
 
-      
-        // K 키: Hover 상태 순환
+        // --- Hover 순환(K) ---
         if (Input.GetKeyDown(KeyCode.K))
         {
-            currentIndex = (currentIndex + 1) % maxOptions;
-            Debug.Log($"Hover 상태: {currentIndex}");
+            // 이전 버튼 원복
+            if (currentIndex >= 0 && currentIndex < buttonImages.Count)
+                buttonImages[currentIndex]
+                    .DOColor(normalColor, colorTweenDur).SetEase(Ease.OutQuad);
+
+            // 다음 인덱스
+            currentIndex = (currentIndex + 1) % buttonImages.Count;
+            Debug.Log($"[OptionBtn] Hover: {currentIndex}");
+
+            // 현재 버튼 강조
+            buttonImages[currentIndex]
+                .DOColor(highlightColor, colorTweenDur).SetEase(Ease.OutBack);
         }
 
-        // Enter 키: 현재 상태 클릭 처리
+        // --- 확정(Enter) ---
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            TriggerSlideOut();
+            if (currentIndex >= 0)
+            {
+                selected.Add(currentIndex);                     // 선택 기록
+                Debug.Log($"선택된 옵션: {string.Join(", ", selected)}");
+                TriggerSlideOut();
+            }
+
+            // 모두 선택 완료?
+            if (selected.Count >= totalOptions)
+            {
+                Debug.Log("[OptionBtn] 전 옵션 선택 완료");
+                // 필요하다면 여기서 TutorialManager.NextStep() 호출 가능
+            }
         }
 
-        // 자동 SlideOut 타이머
+        // --- 자동 슬라이드 아웃 ---
         if (!hasTriggered)
         {
             timer -= Time.deltaTime;
-            if (timerBar != null)
-                timerBar.fillAmount = timer / timeLimit;
-
-            if (timer <= 0f)
-            {
-                TriggerSlideOut();
-            }
+            if (timerBar) timerBar.fillAmount = timer / timeLimit;
+            if (timer <= 0f) TriggerSlideOut();
         }
     }
 
-    void TriggerSlideOut()
-    {
-        if (hasTriggered) return;
-        hasTriggered = true;
-
-        // 1번: 이속제한
-        if (currentIndex == 0 && player != null)
-        {
-            player.SetSpeedLimit(true); // 이속 제한 걸기
-            Debug.Log("이속 제한 ON");
-            StartCoroutine(ReleaseSpeedLimitAfterSeconds(5f)); // 5초 후 자동 해제
-        }
-
-        // 2번: 사운드 뮤트
-        else if (currentIndex == 1)
-        {
-            StartCoroutine(MuteSoundForSeconds(5f));
-        }
-
-        // 3번: 터널 비전효과
-        else if (currentIndex == 2)
-        {
-            if (tunnelVisionMask != null)
-            {
-                tunnelVisionMask.gameObject.SetActive(true);
-                tunnelVisionMask.enabled = true;
-                Debug.Log("터널비전 ON");
-                StartCoroutine(DisableTunnelVisionAfterSeconds(5f));
-            }
-        }
-
-        SlideOut();
-        Debug.Log("SlideOut 발동");
-    }
+    /* ---------- 슬라이드/패널티 ---------- */
 
     void ResetUIAndSlideIn()
     {
@@ -122,48 +107,75 @@ public class OptionButtonUI : MonoBehaviour
         hasAppeared = true;
         currentIndex = -1;
 
-        if (slideTarget != null)
-        {
-            slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY); // 시작 위치
-            slideTarget.DOAnchorPosY(slideInY, slideDuration).SetEase(Ease.OutBack);
-        }
+        // 버튼 색 초기화
+        foreach (var img in buttonImages) img.color = normalColor;
 
-        Debug.Log("SlideIn 반복 실행");
+        slideTarget.anchoredPosition =
+            new Vector2(slideTarget.anchoredPosition.x, slideOutY);
+
+        slideTarget.DOAnchorPosY(slideInY, slideDur).SetEase(Ease.OutBack);
     }
 
-    void SlideOut()
+    void TriggerSlideOut()
     {
-        if (slideTarget != null)
+        if (hasTriggered) return;
+        hasTriggered = true;
+
+        // 선택된 인덱스에 따라 패널티 실행
+        switch (currentIndex)
         {
-            slideTarget.DOAnchorPosY(slideOutY, slideDuration).SetEase(Ease.InBack);
+            case 0:  // 이동속도 제한
+                if (player)
+                {
+                    player.SetSpeedLimit(true);
+                    StartCoroutine(ReleaseSpeedLimitAfter(5f));
+                }
+                break;
+
+            case 1:  // 사운드 OFF
+                StartCoroutine(MuteSoundFor(5f));
+                break;
+
+            case 2:  // 터널 비전
+                if (tunnelVisionMask)
+                {
+                    tunnelVisionMask.gameObject.SetActive(true);
+                    StartCoroutine(DisableTunnelAfter(5f));
+                }
+                break;
         }
+
+        SlideOut();
+
+        // 아직 다 선택 안 했으면 1.5초 후 패널 다시 열기
+        if (selected.Count < totalOptions)
+            StartCoroutine(ReopenAfter(1.5f));
     }
 
-    IEnumerator ReleaseSpeedLimitAfterSeconds(float seconds)
+    void SlideOut() =>
+        slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
+
+    /* ---------- 코루틴 ---------- */
+    IEnumerator ReleaseSpeedLimitAfter(float sec)
     {
-        yield return new WaitForSeconds(seconds);
-        if (player != null)
-        {
-            player.SetSpeedLimit(false); // 제한 해제
-            Debug.Log("이속 제한 OFF");
-        }
+        yield return new WaitForSeconds(sec);
+        if (player) player.SetSpeedLimit(false);
     }
-    IEnumerator MuteSoundForSeconds(float seconds)
+    IEnumerator MuteSoundFor(float sec)
     {
         AudioListener.volume = 0f;
-        Debug.Log("사운드 OFF");
-        yield return new WaitForSeconds(seconds);
+        yield return new WaitForSeconds(sec);
         AudioListener.volume = 1f;
-        Debug.Log("사운드 ON");
     }
-    IEnumerator DisableTunnelVisionAfterSeconds(float seconds)
+    IEnumerator DisableTunnelAfter(float sec)
     {
-        yield return new WaitForSeconds(seconds);
-        if (tunnelVisionMask != null)
-        {
-            tunnelVisionMask.enabled = false;
-            tunnelVisionMask.gameObject.SetActive(false);
-            Debug.Log("터널비전 OFF");
-        }
+        yield return new WaitForSeconds(sec);
+        if (tunnelVisionMask) tunnelVisionMask.gameObject.SetActive(false);
+    }
+    IEnumerator ReopenAfter(float sec)
+    {
+        yield return new WaitForSeconds(sec);
+        hasTriggered = false;
+        ResetUIAndSlideIn();
     }
 }
