@@ -18,7 +18,7 @@ public class RaycastAttack : NetworkBehaviour
 
         if (Input.GetMouseButtonDown(0)) // ÁÂÅ¬¸¯
         {
-            FireRay();
+            //FireRay();
         }
     }
 
