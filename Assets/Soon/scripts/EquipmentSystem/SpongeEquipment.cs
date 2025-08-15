@@ -2,23 +2,34 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SpongeEquipment : EquipmentBase
+public class SpongeEquipment : MonoBehaviour
 {
-    public override void Initialize()
+    public int maxUses = 5;
+    public int currentUses = 0;
+    public bool isDirty = false;
+
+    public void UseSponge()
     {
-        // ������ �ʱ�ȭ ���� (��: �ִϸ��̼� ���� ��)
-        Debug.Log("������ ��� ����");
+        if (isDirty)
+        {
+            Debug.Log("스펀지 세척 필요");
+            return;
+        }
+
+        currentUses++;
+
+        if (currentUses >= maxUses)
+        {
+            isDirty = true;
+            Debug.Log("스펀지 사용 불가");
+        }
     }
 
-    public override void Use()
+    public void WashSponge()
     {
-        // ������ ��� �ൿ ���� (��: ���ɷ��� ȿ��)
-        Debug.Log("������ ���");
-    }
+        if (!isDirty) return;
 
-    public override void Interact()
-    {
-        // ������ ��� �ൿ ���� (��: ���ɷ��� ȿ��)
-        Debug.Log("�Ǽ� ���");
+        currentUses = 0;
+        isDirty = false;
     }
 }
