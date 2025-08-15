@@ -66,19 +66,7 @@ public class PlayerInfo : NetworkBehaviour
             playerName = name;
             nameDisplayTMP.text = name;
         }
-        else
-        {
-            RPC_SetPlayerName(name);
-        }
     }
-
-    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
-    public void RPC_SetPlayerName(string name)
-    {
-        playerName = name;
-        nameDisplayTMP.text = name;
-    }
-
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void DealDamageRpc(float damage)
