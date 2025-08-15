@@ -22,6 +22,7 @@ public class EquipmentManager : MonoBehaviour
 
     [Header("Hand에 직접 배치한 스펀지 오브젝트")]
     public GameObject spongePrefab; // 씬 내 hand 자식으로 직접 할당
+    public SpongeEquipment sponge;
 
     [Header("UI 이미지 (장비 아이콘, 쿨타임 동일)")]
     public Image equipmentIconImage;
@@ -90,13 +91,19 @@ public class EquipmentManager : MonoBehaviour
         {
             if (currentState == EquipmentState.Sponge)
             {
-                if (Time.time - lastInteractTime >= interactCooldown)
+                if(!sponge.isDirty)
                 {
-                    if (playerAnimator != null)
-                        playerAnimator.SetTrigger("cleanTrigger");
-                    lastInteractTime = Time.time;
+                    sponge.UseSponge();
+
+                    if (Time.time - lastInteractTime >= interactCooldown)
+                    {
+                        if (playerAnimator != null)
+                            playerAnimator.SetTrigger("cleanTrigger");
+                        lastInteractTime = Time.time;
+                    }
                 }
             }
+            
             else if (playerRole == PlayerRole.Imposter && currentState == EquipmentState.TrashMode)
             {
                 if (Time.time - lastTrashTime >= trashCooldown)

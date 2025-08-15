@@ -6,7 +6,7 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class Player : MonoBehaviour
 {
-    public Camera playerCamera; 
+    public Camera playerCamera;
     public float walkSpeed = 6f;
     public float runSpeed = 12f;
     public float crouchSpeed = 3f;
@@ -127,6 +127,34 @@ public class Player : MonoBehaviour
     public void SetSpeedLimit(bool value)
     {
         isSpeedLimited = value;
+    }
+
+    public void PlayPickUpCameraMove(Vector3 targetOffset, float duration)
+    {
+        //StopAllCoroutines();
+        StartCoroutine(CameraMoveRoutine(targetOffset, duration));
+    }
+
+    private IEnumerator CameraMoveRoutine(Vector3 targetOffset, float duration)
+    {
+        Vector3 startPos = playerCamera.transform.localPosition;
+        Vector3 endPos = originalCameraPosition + targetOffset;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            playerCamera.transform.localPosition = Vector3.Lerp(startPos, endPos, elapsed / duration);
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            playerCamera.transform.localPosition = Vector3.Lerp(endPos, originalCameraPosition, elapsed / duration);
+            yield return null;
+        }
     }
 
     //IEnumerator CrouchCameraAdjust(Vector3 from, Vector3 to)
