@@ -46,8 +46,6 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     private SessionInfo selectedSession;
     private List<SessionInfo> cachedSessionList = new();
 
-    private Multiplayerchat chatManager;
-
     private void Awake()
     {
         runnerInsatance = gameObject.GetComponent<NetworkRunner>();
@@ -342,21 +340,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         SceneManager.LoadScene(lobbySceneName);
     }
 
-    public void OnSceneLoadDone(NetworkRunner runner)
-    {
-        StartCoroutine(FindChatManager());
-    }
-
-    IEnumerator FindChatManager()
-    {
-        yield return null;
-        chatManager = FindObjectOfType<Multiplayerchat>();
-        if (chatManager != null)
-        {
-            Debug.Log("chatManager ¿¬°áµÊ!");
-        }
-    }
-
+    public void OnSceneLoadDone(NetworkRunner runner) { }
     public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
     public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason) { }
@@ -366,10 +350,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) { }
-    public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
-    {
-        
-    }
+    public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) { }
     public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ArraySegment<byte> data) { }
     public void OnSceneLoadStart(NetworkRunner runner) { }
