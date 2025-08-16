@@ -6,9 +6,9 @@ using UnityEngine.Events;
 public class Interactable : MonoBehaviour
 {
     // Start is called before the first frame update
-
     Outline outline;
     public string message;
+    private EquipmentState currentState = EquipmentState.None;
 
     public UnityEvent onIntercation;
 
@@ -48,25 +48,26 @@ public class Interactable : MonoBehaviour
     }
     public void TryUseSponge(GameObject interactor)
     {
-        SpongeEquipment playerSponge = interactor.GetComponentInChildren<SpongeEquipment>();
-
-        if (playerSponge == null)
+        if (currentState == EquipmentState.Sponge)
         {
-            Debug.LogWarning("스펀지가 없습니다.");
-            return;
+            SpongeEquipment playerSponge = interactor.GetComponentInChildren<SpongeEquipment>();
+
+            if (playerSponge == null)
+            {
+                Debug.LogWarning("스펀지가 없습니다.");
+                return;
+            }
+
+            if (playerSponge.isDirty)
+            {
+                Debug.Log("청소 불가(스펀지 더러움)");
+                return;
+            }
+
+            StartCoroutine(FadeOut());
         }
 
-        if (playerSponge.isDirty)
-        {
-            Debug.Log("청소 불가(스펀지 더러움)");
-            return;
-        }
 
-        // 스펀지가 깨끗한 상태일 때만 닦기 동작으로 FadeOut 실행
-        StartCoroutine(FadeOut());
-
-        // 필요하면 스펀지 사용 처리도 호출
-        //playerSponge.UseSponge();
     }
 
     public void Wash(GameObject interactor)
