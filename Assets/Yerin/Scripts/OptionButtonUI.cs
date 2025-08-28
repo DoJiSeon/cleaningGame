@@ -232,6 +232,14 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     public Image tunnelVisionMask;
     private Player player;
 
+    [Header("슬라이드 연동 텍스트")]
+    [SerializeField] private GameObject slideTextGO;
+
+    [Header("회의 중 옵션 패널 차단")]
+    [SerializeField] private bool suppressDuringMeeting = true;
+
+    private MeetingDirector _meeting;   // 회의 상태 참조
+
     // ====== 네트워크 동기화용 타이머(열림 스케줄) ======
     [Networked] private TickTimer NextOpenTimer { get; set; }
 
@@ -250,6 +258,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         player = FindObjectOfType<Player>();
         // StateAuthority가 아니라면 타이머는 건드리지 않음
+        _meeting = FindObjectOfType<MeetingDirector>(); 
     }
 
     public override void Spawned()
@@ -278,6 +287,13 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         // 패널 오픈 스케줄을 호스트가 관리
         if (Object.HasStateAuthority && NextOpenTimer.Expired(Runner))
         {
+            // 회의 중이면 오픈 금지: 1초 뒤 다시 검사
+            if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn)
+            {
+                NextOpenTimer = TickTimer.CreateFromSeconds(Runner, 1f);
+                return;
+            }
+
             RpcOpenPanel(); // 모두 동시에 열리게
             NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
         }
@@ -285,6 +301,16 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
     void Update()
     {
+
+        // MeetingDirector를 늦게 찾은 경우 대비
+        if (_meeting == null) _meeting = FindObjectOfType<MeetingDirector>();
+
+        // 회의 중이면 로컬 UI가 열려 있어도 바로 닫기
+        if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn && _phase != Phase.Closed)
+        {
+            RpcClosePanel();
+        }
+
         // 로컬 패널 열림 중이면 남은 시간 바 표시(연출용)
         if (_phase == Phase.ChoosingTarget || _phase == Phase.ChoosingPenalty)
         {
@@ -368,6 +394,19 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY);
             slideTarget.DOAnchorPosY(slideInY, slideDur).SetEase(Ease.OutBack);
         }
+
+        // 텍스트 활성화 (슬라이드 인 시작과 동시에 켬)
+        if (slideTextGO) slideTextGO.SetActive(true);
+
+        // 슬라이드 인
+        if (slideTarget)
+        {
+            slideTarget.DOKill();
+            slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY);
+            slideTarget
+                .DOAnchorPosY(slideInY, slideDur)
+                .SetEase(Ease.OutBack);
+        }
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
@@ -380,6 +419,11 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         {
             slideTarget.DOKill();
             slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
+        }
+        else
+        {
+            // 슬라이드 트랜스폼이 없으면 즉시 끔
+            if (slideTextGO) slideTextGO.SetActive(false);
         }
     }
 
