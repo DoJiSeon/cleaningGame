@@ -8,6 +8,7 @@ using UnityEngine;
 
 public class MeetingDirector : NetworkBehaviour
 {
+
     [Header("라운드/회의 타이머 UI")]
     [SerializeField] private TextMeshProUGUI roundTimerText;   // 상단 라운드 타이머
     [SerializeField] private TextMeshProUGUI meetingTimerText; // 회의 타이머(회의 패널 안)
@@ -136,6 +137,8 @@ public class MeetingDirector : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcStartMeeting_All(Vector3 tpPos, bool freeze)
     {
+        Debug.Log("[Meeting] RpcStartMeeting_All fired on " + (Runner ? Runner.LocalPlayer.PlayerId : -1));
+
         _meetingOnCached = true; // ← 캐시 갱신
         SetRoundTimerVisible(false);
 
@@ -272,11 +275,11 @@ public class MeetingDirector : NetworkBehaviour
         if (remain.HasValue)
         {
             double s = Math.Max(0.0, remain.Value);
-            meetingTimerText.text = $"회의 {FormatMMSS(s)}";
+            meetingTimerText.text = $"{FormatMMSS(s)}";
         }
         else
         {
-            meetingTimerText.text = "회의 —:—";
+            meetingTimerText.text = "—:—";
         }
     }
 

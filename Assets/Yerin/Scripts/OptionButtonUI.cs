@@ -1,199 +1,3 @@
-/* 레거시 코드
- * 
- * 
- * 
-using UnityEngine;
-using UnityEngine.UI;
-using System.Collections;
-using System.Collections.Generic;
-using DG.Tweening;
-
-public class OptionButtonUI : MonoBehaviour
-{
-    [Header("타이머")]
-    public Image timerBar;
-    public float timeLimit = 20f;   // 슬라이드 아웃까지 남은 시간
-
-    [Header("패널 슬라이드")]
-    public RectTransform slideTarget;
-    public float slideInY = 0f;
-    public float slideOutY = -300f;
-    public float slideDur = 0.5f;
-
-    [Header("패널 표시 간격")]
-    public float interval = 300f;      // 5분
-    private float playTimer, nextTriggerTime;
-
-    [Header("버튼 하이라이트")]
-    public List<Image> buttonImages;                // Hover 대상들
-    public Color normalColor = Color.white;
-    public Color highlightColor = new Color(1f, 0.8f, 0.3f, 1f);
-    public float colorTweenDur = 0.2f;
-    public int totalOptions = 4;              // 선택해야 할 옵션 수
-
-    [Header("패널티 기능")]
-    public Image tunnelVisionMask;
-    private Player player;
-
-    // 내부 상태
-    float timer;
-    bool hasAppeared, hasTriggered;
-    int currentIndex = -1;
-    HashSet<int> selected = new HashSet<int>();
-
-    void Start()
-    {
-        player = FindObjectOfType<Player>();
-        nextTriggerTime = interval;                 // 5분 뒤 첫 표시
-    }
-
-    void Update()
-    {
-        // --- 패널 표시 주기 ---
-        playTimer += Time.deltaTime;
-        if (playTimer >= nextTriggerTime)
-        {
-            ResetUIAndSlideIn();
-            nextTriggerTime += interval;
-        }
-        if (!hasAppeared) return;
-
-        // --- Hover 순환(K) ---
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            // 이전 버튼 원복
-            if (currentIndex >= 0 && currentIndex < buttonImages.Count)
-                buttonImages[currentIndex]
-                    .DOColor(normalColor, colorTweenDur).SetEase(Ease.OutQuad);
-
-            // 다음 인덱스
-            currentIndex = (currentIndex + 1) % buttonImages.Count;
-            Debug.Log($"[OptionBtn] Hover: {currentIndex}");
-
-            // 현재 버튼 강조
-            buttonImages[currentIndex]
-                .DOColor(highlightColor, colorTweenDur).SetEase(Ease.OutBack);
-        }
-
-        // --- 확정(Enter) ---
-        if (Input.GetKeyDown(KeyCode.Return))
-        {
-            if (currentIndex >= 0)
-            {
-                selected.Add(currentIndex);                     // 선택 기록
-                Debug.Log($"선택된 옵션: {string.Join(", ", selected)}");
-                TriggerSlideOut();
-            }
-
-            // 모두 선택 완료?
-            if (selected.Count >= totalOptions)
-            {
-                Debug.Log("[OptionBtn] 전 옵션 선택 완료");
-                // 필요하다면 여기서 TutorialManager.NextStep() 호출 가능
-            }
-        }
-
-        // --- 자동 슬라이드 아웃 ---
-        if (!hasTriggered)
-        {
-            timer -= Time.deltaTime;
-            if (timerBar) timerBar.fillAmount = timer / timeLimit;
-            if (timer <= 0f) TriggerSlideOut();
-        }
-    }
-
-    /* ---------- 슬라이드/패널티 ---------- */
-/*
-
-    void ResetUIAndSlideIn()
-    {
-        timer = timeLimit;
-        hasTriggered = false;
-        hasAppeared = true;
-        currentIndex = -1;
-
-        // 버튼 색 초기화
-        foreach (var img in buttonImages) img.color = normalColor;
-
-        slideTarget.anchoredPosition =
-            new Vector2(slideTarget.anchoredPosition.x, slideOutY);
-
-        slideTarget.DOAnchorPosY(slideInY, slideDur).SetEase(Ease.OutBack);
-    }
-
-    void TriggerSlideOut()
-    {
-        if (hasTriggered) return;
-        hasTriggered = true;
-
-        // 선택된 인덱스에 따라 패널티 실행
-        switch (currentIndex)
-        {
-            case 0:  // 이동속도 제한
-                if (player)
-                {
-                    player.SetSpeedLimit(true);
-                    StartCoroutine(ReleaseSpeedLimitAfter(5f));
-                }
-                break;
-
-            case 1:  // 사운드 OFF
-                StartCoroutine(MuteSoundFor(5f));
-                break;
-
-            case 2:  // 터널 비전
-                if (tunnelVisionMask)
-                {
-                    tunnelVisionMask.gameObject.SetActive(true);
-                    StartCoroutine(DisableTunnelAfter(5f));
-                }
-                break;
-        }
-
-        SlideOut();
-
-        // 아직 다 선택 안 했으면 1.5초 후 패널 다시 열기
-        if (selected.Count < totalOptions)
-            StartCoroutine(ReopenAfter(1.5f));
-    }
-
-    void SlideOut() =>
-        slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
-
-    /* ---------- 코루틴 ---------- */
-/*
-    IEnumerator ReleaseSpeedLimitAfter(float sec)
-    {
-        yield return new WaitForSeconds(sec);
-        if (player) player.SetSpeedLimit(false);
-    }
-    IEnumerator MuteSoundFor(float sec)
-    {
-        AudioListener.volume = 0f;
-        yield return new WaitForSeconds(sec);
-        AudioListener.volume = 1f;
-    }
-    IEnumerator DisableTunnelAfter(float sec)
-    {
-        yield return new WaitForSeconds(sec);
-        if (tunnelVisionMask) tunnelVisionMask.gameObject.SetActive(false);
-    }
-    IEnumerator ReopenAfter(float sec)
-    {
-        yield return new WaitForSeconds(sec);
-        hasTriggered = false;
-        ResetUIAndSlideIn();
-    }
-}
-
-*/
-
-
-
-
-
-
-
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -206,8 +10,12 @@ using System;  // for Enum
 
 public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 {
+    // 혼자 테스트 용
+    [Header("테스트 옵션")]
+    [SerializeField] private bool allowSelfTargetForTest = false;
+
     [Header("타이머(패널 오픈 간격)")]
-    public float interval = 300f;      // 패널이 열리는 간격(초)
+    public float interval = 300f;     
 
     [Header("패널 슬라이드")]
     public RectTransform slideTarget;
@@ -228,12 +36,12 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     [Header("타겟 표시(선택 확인용, 로컬)")]
     public Text targetLabel;
 
-    [Header("패널티 기능(로컬 적용)")]
+    [Header("패널티 기능")]
     public Image tunnelVisionMask;
     private Player player;
 
     [Header("슬라이드 연동 텍스트")]
-    [SerializeField] private GameObject slideTextGO;
+    [SerializeField] private GameObject slideTextGO;  // 클린게이지
 
     [Header("회의 중 옵션 패널 차단")]
     [SerializeField] private bool suppressDuringMeeting = true;
@@ -324,8 +132,13 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             }
         }
 
-        // 입력은 내 입력권한만 처리
-        if (!Object || !Object.HasInputAuthority) return;
+        // 입력은 내 입력권한만 처리 -
+        // 테스트 모드면 K 사이클링을 위해 입력 가드를 우회(Enter 확정은 아래에서 별도 분기)
+        bool allowLocalInput = Object && Object.HasInputAuthority;
+        bool testBypass = allowSelfTargetForTest;
+
+        if (!allowLocalInput && !testBypass)
+            return;
 
         // == 키 바인딩은 K / Enter만 ==
         if (_phase == Phase.ChoosingTarget)
@@ -356,15 +169,31 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             }
             if (Input.GetKeyDown(KeyCode.Return))
             {
-                // 패널티 확정 → 타겟에게만 적용 + 모두 패널 닫기
                 if (_targetIndex >= 0 && _targetIndex < _targets.Count)
                 {
                     var target = _targets[_targetIndex];
-                    RpcApplyPenaltyToTarget(target, _penaltyIndex);
+
+                    if (Object != null && Object.HasInputAuthority)
+                    {
+                        // 정상 경로: RPC로 적용
+                        RpcApplyPenaltyToTarget(target, _penaltyIndex);
+                    }
+                    else if (allowSelfTargetForTest)
+                    {
+                        // 테스트 경로: 권한 없어도 로컬로만 적용
+                        ApplyPenaltyLocal(_penaltyIndex);
+                    }
                 }
 
-                // 닫기는 호스트가 트리거 (중복 호출 방지)
-                if (Object.HasStateAuthority) RpcClosePanel();
+                // 닫기: 호스트면 RPC, 테스트면 로컬로만 닫기 연출
+                if (Object != null && Object.HasStateAuthority)
+                {
+                    RpcClosePanel();
+                }
+                else if (allowSelfTargetForTest)
+                {
+                    LocalClosePanelVisual();
+                }
             }
         }
     }
@@ -425,7 +254,10 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             // 슬라이드 트랜스폼이 없으면 즉시 끔
             if (slideTextGO) slideTextGO.SetActive(false);
         }
+
+        if (slideTextGO) slideTextGO.SetActive(false);
     }
+
 
     private void EnterPenaltyPhase()
     {
@@ -433,7 +265,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         _penaltyIndex = Mathf.Clamp(_penaltyIndex, 0, Mathf.Max(0, buttonImages.Count - 1));
         RefreshPenaltyHighlight();
     }
-
     /* ================= 타겟/패널티 선택(로컬 UI) ================= */
 
     private void CycleTarget()
@@ -487,6 +318,18 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
     }
 
+    private void LocalClosePanelVisual()
+    {
+        _phase = Phase.Closed;
+        if (slideTarget)
+        {
+            slideTarget.DOKill();
+            slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
+        }
+        if (slideTextGO) slideTextGO.SetActive(false);
+    }
+
+
     /* ================= 타겟 목록 최신화 ================= */
 
     private void BuildTargetList()
@@ -496,8 +339,11 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         foreach (var p in Runner.ActivePlayers)
         {
-            if (p != Runner.LocalPlayer)  // 본인 제외
-                _targets.Add(p);
+            // 테스트 OFF면 본인 제외 / 테스트 ON이면 본인 포함
+            if (!allowSelfTargetForTest && p == Runner.LocalPlayer)
+                continue;
+
+            _targets.Add(p);
         }
 
         // 현재 인덱스 유효성 보정
@@ -505,6 +351,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         else if (_targetIndex < 0) _targetIndex = 0;
         else _targetIndex = Mathf.Min(_targetIndex, _targets.Count - 1);
     }
+
 
     /* ================= 패널티 적용(타겟 본인만 로컬 적용) ================= */
 
@@ -520,27 +367,45 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
     private void ApplyPenaltyLocal(int optionIndex)
     {
+
+        float dur = 5f;
+
+        // Debuff HUD 찾기 (비활성 포함) >> 아 이거 이렇게 둬두되나..
+        var ui = FindObjectOfType<DebuffUI>(true);
+
+
         switch (optionIndex)
         {
             case 0: // 이동속도 제한
                 if (player)
                 {
                     player.SetSpeedLimit(true);
-                    StartCoroutine(ReleaseSpeedLimitAfter(5f));
+                    StartCoroutine(ReleaseSpeedLimitAfter(dur));
                 }
+                if (ui) ui.Show(DebuffType.SpeedLimit, dur);
                 break;
 
-            case 1: // 사운드 OFF
-                StartCoroutine(MuteSoundFor(5f));
+            case 1: // 무음
+                StartCoroutine(MuteSoundFor(dur));
+                if (ui) ui.Show(DebuffType.Mute, dur);
                 break;
 
             case 2: // 터널 비전
                 if (tunnelVisionMask)
                 {
                     tunnelVisionMask.gameObject.SetActive(true);
-                    StartCoroutine(DisableTunnelAfter(5f));
+                    StartCoroutine(DisableTunnelAfter(dur));
                 }
+                if (ui) ui.Show(DebuffType.TunnelVision, dur);
                 break;
+
+            case 3: // UI 잠금
+                {
+                    var equip = FindObjectOfType<EquipmentManager>(true);
+                    if (equip) equip.LockUI(dur);
+                    if (ui) ui.Show(DebuffType.UILock, dur);
+                    break;
+                }
 
             default:
                 break;
