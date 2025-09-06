@@ -301,6 +301,36 @@ public class VoteUI : MonoBehaviour
         rt.localRotation = Quaternion.Euler(0, 0, Random.Range(-15f, 15f));
         rt.DOScale(1f, 0.25f).SetEase(Ease.OutBack).SetUpdate(true);
     }
+    public void RebuildWithWhitelist(NetworkRunner runner, IList<int> playerIdWhitelist)
+    {
+        ClearAll();
+        if (runner != null)
+        {
+            foreach (var p in runner.ActivePlayers)
+            {
+                if (excludeSelf && p == runner.LocalPlayer) continue;
+                if (playerIdWhitelist != null && playerIdWhitelist.Count > 0)
+                {
+                    if (!playerIdWhitelist.Contains(p.PlayerId)) continue;
+                }
+                AddItem(p);
+            }
+        }
 
+        _hasVoted = false;
+        if (_items.Count > 0)
+        {
+            _cursorIndex = 0;
+            _selected = _items[0].playerRef;
+        }
+        else
+        {
+            _cursorIndex = -1;
+            _selected = null;
+        }
+
+        RefreshVisuals();
+        CloseConfirm();
+    }
 
 }

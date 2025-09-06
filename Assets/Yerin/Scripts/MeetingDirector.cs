@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Fusion;
 using Fusion.Sockets;
 using TMPro;
@@ -8,6 +9,25 @@ using UnityEngine;
 
 public class MeetingDirector : NetworkBehaviour
 {
+    // === [추가] 공용 연출 훅 ===
+    [Header("결과 연출")]
+
+    // === 컷씬/카메라 ===
+    [SerializeField] private UnityEngine.Playables.PlayableDirector executionTimeline; // 타임라인
+    [SerializeField] private Cinemachine.CinemachineVirtualCamera vcam;               // 지목자 포커스용 VCam
+
+    // === 결과 패널(UI) ===
+    [SerializeField] private GameObject resultPanelLocal;      // 비활성 시작
+    [SerializeField] private TMP_Text resultTitleText;         // "정화 성공!" / "방해자 성공!" 등
+    [SerializeField] private TMP_Text resultDetailText;        // "(플레이어이름)은 방해자였습니다." 등
+    [SerializeField] private TMP_Text resultAccusedNameText;   // "지목: Player 2" 같은 표시(원하면)
+
+    [Header("재투표")]
+    [SerializeField] private float revoteDuration = 15f; // 재투표 시간
+
+    // 투표 집계용(서버 전용 사용)
+    private readonly Dictionary<PlayerRef, PlayerRef> _votes = new();
+    [SerializeField] private VoteUI voteUI;
 
     [Header("라운드/회의 타이머 UI")]
     [SerializeField] private TextMeshProUGUI roundTimerText;   // 상단 라운드 타이머
@@ -29,17 +49,11 @@ public class MeetingDirector : NetworkBehaviour
     [Networked] private bool IsMeetingActive { get; set; }
     [Networked] private TickTimer MeetingTimer { get; set; }
 
-    // 투표: key=투표자, value=피투표자
-    private readonly Dictionary<PlayerRef, PlayerRef> _votes = new();
-
     // 회의 시간(초)
     public float meetingDuration = 20f;
-
-    // MeetingDirector.cs (클래스 본문 상단 어딘가)
     [SerializeField] private bool _meetingOnCached = false;
 
-    [SerializeField] private VoteUI voteUI;
-    // 외부(UI 등)에서 안전하게 읽기 위한 getter — 네트워크 상태와 무관하게 안전
+    // 외부(UI 등)에서 안전하게 읽기 위한 getter
     public bool IsMeetingOn => _meetingOnCached;
 
     // UI 업데이트 루프
@@ -48,7 +62,7 @@ public class MeetingDirector : NetworkBehaviour
     // --- 라이프사이클 ---
     public override void Spawned()
     {
-        _meetingOnCached = false; // 초기화
+        _meetingOnCached = false;
         if (Object.HasStateAuthority)
             RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
 
@@ -60,9 +74,10 @@ public class MeetingDirector : NetworkBehaviour
 
     public override void Despawned(NetworkRunner runner, bool hasState)
     {
-        _meetingOnCached = false; // 정리
+        _meetingOnCached = false;
         if (_uiTimerRoutine != null) { StopCoroutine(_uiTimerRoutine); _uiTimerRoutine = null; }
     }
+
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority) return;
@@ -77,7 +92,6 @@ public class MeetingDirector : NetworkBehaviour
             }
             else
             {
-                // 성공 라운드 처리(원한다면 별도 UI/이벤트)
                 RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration); // 다음 라운드
             }
         }
@@ -89,21 +103,19 @@ public class MeetingDirector : NetworkBehaviour
         }
     }
 
-    // --- 서버(호스트)에서 회의 시작 판정 ---
+    // --- 서버(호스트)에서 회의 시작 ---
     private void StartMeeting_Server()
     {
         IsMeetingActive = true;
         MeetingTimer = TickTimer.CreateFromSeconds(Runner, meetingDuration);
         _votes.Clear();
 
-        // 모두를 회의장으로 보내고, 이동/행동 봉인 + 회의 UI 오픈
         RpcStartMeeting_All(meetingPoint ? meetingPoint.position : Vector3.zero, freezeMovementDuringMeeting);
     }
 
     // --- 서버(호스트)에서 회의 종료/발표 ---
     private void EndMeetingAndAnnounce_Server()
     {
-        // 최다득표자 계산
         var tally = new Dictionary<PlayerRef, int>();
         foreach (var pair in _votes)
         {
@@ -111,35 +123,117 @@ public class MeetingDirector : NetworkBehaviour
             tally[pair.Value]++;
         }
 
-        PlayerRef? winner = null;
+        if (tally.Count == 0)
+        {
+            RpcEndMeeting_All(-1, false);
+            IsMeetingActive = false;
+            SpawnManager.Instance?.ResetRoundCounts();
+            RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+            return;
+        }
+
+        // 최대 득표 탐색 + 동률 후보 수집
         int max = 0;
+        var topCandidates = new List<PlayerRef>();
         foreach (var kv in tally)
         {
             if (kv.Value > max)
             {
                 max = kv.Value;
-                winner = kv.Key;
+                topCandidates.Clear();
+                topCandidates.Add(kv.Key);
+            }
+            else if (kv.Value == max)
+            {
+                topCandidates.Add(kv.Key);
             }
         }
 
-        int selectedId = winner.HasValue ? winner.Value.PlayerId : -1;
-        RpcEndMeeting_All(selectedId);
+        if (topCandidates.Count == 1)
+        {
+            var winner = topCandidates[0];
+            bool caughtSaboteur = IsSaboteur(winner);
 
-        // 회의 종료 상태
-        IsMeetingActive = false;
+            RpcPlayExecution_All(winner.PlayerId);
+            RpcEndMeeting_All(winner.PlayerId, caughtSaboteur);
 
-        // 다음 라운드 시작(게이지/카운트 초기화도 여기서)
-        SpawnManager.Instance?.ResetRoundCounts();
-        RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+            IsMeetingActive = false;
+            SpawnManager.Instance?.ResetRoundCounts();
+            RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+        }
+        else
+        {
+            StartRevote_Server(topCandidates);
+        }
     }
 
-    // --- 모든 클라: 회의 시작 연출/TP/봉인 ---
+    // === 결과 표시 RPC ===
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcEndMeeting_All(int accusedPlayerId, bool caughtSaboteur)
+    {
+        _meetingOnCached = false;
+        SetRoundTimerVisible(true);
+
+        FreezeLocalOwnedCharacter(false);
+        if (meetingUI) meetingUI.SetActive(false);
+
+        var accusedRef = PlayerRefFromId(accusedPlayerId);
+        var accusedName = GetPlayerDisplayName(accusedRef);
+
+        var me = GetLocalPlayerInfo();
+        bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        string title = caughtSaboteur
+            ? (iAmSaboteur ? "방해자 패배…" : "정화 성공!")
+            : (iAmSaboteur ? "방해자 성공!" : "검거 실패…");
+
+        string detail = caughtSaboteur
+            ? $"{accusedName} 은(는) 방해자였습니다."
+            : $"{accusedName} 은(는) 청소부였습니다.";
+
+        if (resultTitleText) resultTitleText.text = title;
+        if (resultDetailText) resultDetailText.text = detail;
+        if (resultAccusedNameText) resultAccusedNameText.text = $"지목: {accusedName}";
+
+        if (resultPanelLocal)
+        {
+            resultPanelLocal.SetActive(true);
+            StartCoroutine(CoShowResultPanelThenHide(2.0f));
+        }
+
+        if (Runner != null && Runner.LocalPlayer.PlayerId == accusedPlayerId)
+        {
+            Debug.Log("[Meeting] 내가 지목됨!");
+            // TODO: 추방/관전 전환 처리
+        }
+    }
+
+    // === 컷씬 실행 RPC ===
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcPlayExecution_All(int accusedPlayerId)
+    {
+        var t = FindAccusedTransform(accusedPlayerId);
+        if (vcam && t)
+        {
+            vcam.Follow = t;
+            vcam.LookAt = t;
+        }
+
+        if (executionTimeline)
+        {
+            executionTimeline.time = 0;
+            executionTimeline.Evaluate();
+            executionTimeline.Play();
+        }
+    }
+
+    // --- 회의 시작 연출 ---
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcStartMeeting_All(Vector3 tpPos, bool freeze)
     {
         Debug.Log("[Meeting] RpcStartMeeting_All fired on " + (Runner ? Runner.LocalPlayer.PlayerId : -1));
 
-        _meetingOnCached = true; // ← 캐시 갱신
+        _meetingOnCached = true;
         SetRoundTimerVisible(false);
 
         TeleportLocalOwnedCharacter(tpPos);
@@ -149,71 +243,100 @@ public class MeetingDirector : NetworkBehaviour
         voteUI?.Rebuild(Runner);
     }
 
-    // --- 모든 클라: 회의 종료 + 결과 알림/해제 ---
-    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RpcEndMeeting_All(int selectedPlayerId)
+    private IEnumerator CoShowResultPanelThenHide(float showSec)
     {
-
-        _meetingOnCached = false; // ← 캐시 갱신
-        SetRoundTimerVisible(true);
-
-        FreezeLocalOwnedCharacter(false);
-        if (meetingUI) meetingUI.SetActive(false);
-
-
-        // 봉인 해제 + UI 닫기
-        FreezeLocalOwnedCharacter(false);
-        if (meetingUI) meetingUI.SetActive(false);
-
-        // 결과 처리(선택된 플레이어가 로컬이면 별도 연출 가능)
-        if (selectedPlayerId >= 0 && Runner != null)
-        {
-            var localId = Runner.LocalPlayer.PlayerId;
-            if (localId == selectedPlayerId)
-            {
-                Debug.Log("[Meeting] 내가 지목됨!");
-                // TODO: 마피아/추방 연출, 리스폰/관전 전환 등
-            }
-        }
+        resultPanelLocal.SetActive(true);
+        yield return new WaitForSecondsRealtime(showSec);
+        resultPanelLocal.SetActive(false);
     }
 
     // --- 투표 제출: 각 클라 → 서버 ---
-    public void SubmitVote(PlayerRef voted)   // UI에서 호출
+    public void SubmitVote(PlayerRef voted)
     {
-        if (!Object || !Object.HasInputAuthority) return;
+        if (!Object) return;
         RpcSubmitVote_Server(voted);
     }
 
-    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
-    private void RpcSubmitVote_Server(PlayerRef voted)
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RpcSubmitVote_Server(PlayerRef voted, RpcInfo info = default)
     {
         if (!IsMeetingActive) return;
 
-        // 주의: InputAuthority 사용 방식은 프로젝트 구조에 맞게 조정 필요
-        var voter = Object.InputAuthority;
-        if (_votes.ContainsKey(voter)) _votes[voter] = voted;
-        else _votes.Add(voter, voted);
+        var voter = info.Source;
+        _votes[voter] = voted;
 
-        // 모두 투표 완료 시 즉시 마감하고 싶다면:
-        // if (_votes.Count >= Runner.ActivePlayers.Count()) EndMeetingAndAnnounce_Server();
+        int need = GetEligibleVoterCount();
+        if (_votes.Count >= need)
+        {
+            StartCoroutine(CoEarlyFinishDelay(3f)); // 3초 대기 후 집계
+        }
     }
 
-    // --- 로컬 유틸: 내 캐릭터 TP/봉인 ---
+    private IEnumerator CoEarlyFinishDelay(float delaySec)
+    {
+        if (_earlyFinishPending) yield break;
+        _earlyFinishPending = true;
+
+        yield return new WaitForSeconds(delaySec);
+
+        EndMeetingAndAnnounce_Server();
+        _earlyFinishPending = false;
+    }
+
+    private bool _earlyFinishPending = false;
+
+    private int GetEligibleVoterCount()
+    {
+        return Runner != null ? Runner.ActivePlayers.Count() : 0;
+    }
+
+    // --- 재투표 ---
+    private void StartRevote_Server(List<PlayerRef> finalists)
+    {
+        IsMeetingActive = true;
+        MeetingTimer = TickTimer.CreateFromSeconds(Runner, revoteDuration);
+        _votes.Clear();
+
+        RpcStartRevote_All(ConvertToIdArray(finalists), (int)revoteDuration);
+    }
+
+    private int[] ConvertToIdArray(List<PlayerRef> list)
+    {
+        var arr = new int[list.Count];
+        for (int i = 0; i < list.Count; i++) arr[i] = list[i].PlayerId;
+        return arr;
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcStartRevote_All(int[] finalistIds, int durationSec)
+    {
+        Debug.Log("[Meeting] 재투표 시작. 후보: " + string.Join(",", finalistIds ?? Array.Empty<int>()));
+
+        _meetingOnCached = true;
+        SetRoundTimerVisible(false);
+
+        if (meetingUI) meetingUI.SetActive(true);
+
+        var whiteList = new List<int>(finalistIds ?? Array.Empty<int>());
+        voteUI?.RebuildWithWhitelist(Runner, whiteList);
+
+        meetingDuration = durationSec;
+    }
+
+    // --- 로컬 유틸 ---
     private void TeleportLocalOwnedCharacter(Vector3 pos)
     {
-        // 각 프로젝트에서 "내 캐릭터" 참조 얻는 방법이 다름
         var my = FindObjectOfType<Player>();
-        if (my) my.TeleportTo(pos);  // Player 스크립트에 TeleportTo(Vector3) 필요
+        if (my) my.TeleportTo(pos);
     }
 
     private void FreezeLocalOwnedCharacter(bool freeze)
     {
         var my = FindObjectOfType<Player>();
         if (!my) return;
-        my.SetInputLocked(freeze);   // Player 스크립트에 SetInputLocked(bool) 필요
+        my.SetInputLocked(freeze);
     }
 
-    // --- UI 갱신 루프 ---
     private IEnumerator CoUpdateTimersUI()
     {
         var wait = new WaitForSecondsRealtime(0.1f);
@@ -227,18 +350,17 @@ public class MeetingDirector : NetworkBehaviour
 
     private void UpdateRoundTimerUI()
     {
-        if (!roundTimerText)
-            return;
+        if (!roundTimerText) return;
 
         if (Runner == null)
         {
-            roundTimerText.text = "…"; // 네트워크 준비 대기
+            roundTimerText.text = "…";
             return;
         }
 
         if (IsMeetingActive)
         {
-            roundTimerText.text = "—:—"; // 회의 중엔 라운드 타이머 숨김
+            roundTimerText.text = "—:—";
             return;
         }
 
@@ -250,14 +372,13 @@ public class MeetingDirector : NetworkBehaviour
         }
         else
         {
-            roundTimerText.text = "—:—"; // 아직 동기화 전
+            roundTimerText.text = "—:—";
         }
     }
 
     private void UpdateMeetingTimerUI()
     {
-        if (!meetingTimerText)
-            return;
+        if (!meetingTimerText) return;
 
         if (Runner == null)
         {
@@ -267,7 +388,7 @@ public class MeetingDirector : NetworkBehaviour
 
         if (!IsMeetingActive)
         {
-            meetingTimerText.text = ""; // 회의 아닐 때 숨김
+            meetingTimerText.text = "";
             return;
         }
 
@@ -296,7 +417,6 @@ public class MeetingDirector : NetworkBehaviour
             roundTimerText.gameObject.SetActive(visible);
     }
 
-    // 디버그용: 강제 회의 시작/종료 키
     private void Update()
     {
         if (Runner == null) return;
@@ -310,6 +430,54 @@ public class MeetingDirector : NetworkBehaviour
         }
     }
 
+    // --- Helper Methods ---
+    private PlayerInfo GetPlayerInfo(PlayerRef pref)
+    {
+        foreach (var pi in FindObjectsOfType<PlayerInfo>())
+            if (pi && pi.Object && pi.Object.InputAuthority == pref)
+                return pi;
+        return null;
+    }
+
+    private PlayerInfo GetLocalPlayerInfo()
+    {
+        if (Runner == null) return null;
+        foreach (var pi in FindObjectsOfType<PlayerInfo>())
+            if (pi && pi.Object && pi.Object.InputAuthority == Runner.LocalPlayer)
+                return pi;
+        return null;
+    }
+
+    private bool IsSaboteur(PlayerRef pref)
+    {
+        var pi = GetPlayerInfo(pref);
+        return pi && pi.PlayerRole == PlayerInfo.Role.Saboteur;
+    }
+
+    private string GetPlayerDisplayName(PlayerRef pref)
+    {
+        var pi = GetPlayerInfo(pref);
+        return pi ? (string.IsNullOrEmpty(pi.cachedName) ? $"Player {pref.PlayerId}" : pi.cachedName)
+                  : $"Player {pref.PlayerId}";
+    }
+
+    private Transform FindAccusedTransform(int accusedPlayerId)
+    {
+        foreach (var pi in FindObjectsOfType<PlayerInfo>())
+            if (pi && pi.Object && pi.Object.InputAuthority.PlayerId == accusedPlayerId)
+                return pi.transform;
+        return null;
+    }
+
+    private PlayerRef PlayerRefFromId(int id)
+    {
+        if (Runner != null)
+            foreach (var p in Runner.ActivePlayers)
+                if (p.PlayerId == id) return p;
+        return default;
+    }
+
+    // --- Runner Hooks ---
     private class RunnerHooks : INetworkRunnerCallbacks
     {
         private readonly MeetingDirector _dir;
@@ -324,7 +492,6 @@ public class MeetingDirector : NetworkBehaviour
             if (_dir.IsMeetingOn) _dir.voteUI?.Rebuild(runner);
         }
 
-        // 나머지 콜백은 비워둔다
         public void OnConnectedToServer(NetworkRunner r) { }
         public void OnDisconnectedFromServer(NetworkRunner r, NetDisconnectReason reason) { }
         public void OnConnectRequest(NetworkRunner r, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
