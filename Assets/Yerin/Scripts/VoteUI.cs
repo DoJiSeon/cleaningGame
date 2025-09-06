@@ -62,7 +62,7 @@ public class VoteUI : MonoBehaviour
     // 커서 복원용 저장
     private CursorLockMode _prevLock;
     private bool _prevVisible;
-
+    private NetworkRunner _runner;  // ← 러너 보관
     private void Awake()
     {
         if (confirmPanel) confirmPanel.SetActive(false);
@@ -70,6 +70,7 @@ public class VoteUI : MonoBehaviour
 
     public void Rebuild(NetworkRunner runner)
     {
+        _runner = runner;           // ← 추가: 이후 이름 해석에 사용
         ClearAll();
 
         if (runner != null)
@@ -145,11 +146,48 @@ public class VoteUI : MonoBehaviour
         var text = go.transform.Find("Label")?.GetComponent<TMP_Text>();
 
         if (img) img.color = bgNormal;
-        if (text) { text.text = $"Player {pref.PlayerId}"; text.raycastTarget = false; }
+        if (text)
+        {
+            text.text = ResolvePlayerName(pref);  // ← 여기만 변경!
+            text.raycastTarget = false;
+        }
 
         var item = new Item { go = go, rt = rt, bg = img, nameText = text, playerRef = pref };
         _items.Add(item);
     }
+
+    // PlayerRef → PlayerInfo → 이름 문자열
+    private string ResolvePlayerName(PlayerRef pref)
+    {
+        // 1) 정석: PlayerObject 매핑 통해 즉시 찾기
+        if (_runner != null && _runner.TryGetPlayerObject(pref, out var obj) && obj != null)
+        {
+            var pi = obj.GetComponent<PlayerInfo>();
+            if (pi != null)
+            {
+                if (!string.IsNullOrEmpty(pi.cachedName)) return pi.cachedName;
+
+                var netName = pi.playerName.ToString();
+                if (!string.IsNullOrEmpty(netName)) return netName;
+            }
+        }
+
+        // 2) 폴백: 씬에서 직접 탐색(스폰 직후 매핑 지연 대비)
+        foreach (var pi in Object.FindObjectsOfType<PlayerInfo>(true))
+        {
+            if (pi != null && pi.Object != null && pi.Object.InputAuthority == pref)
+            {
+                if (!string.IsNullOrEmpty(pi.cachedName)) return pi.cachedName;
+
+                var netName = pi.playerName.ToString();
+                if (!string.IsNullOrEmpty(netName)) return netName;
+            }
+        }
+
+        // 3) 최후 폴백: 아이디
+        return $"Player {pref.PlayerId}";
+    }
+
 
     private void RefreshVisuals()
     {
