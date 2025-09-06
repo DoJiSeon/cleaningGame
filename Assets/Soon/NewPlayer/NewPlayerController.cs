@@ -1,0 +1,207 @@
+using Fusion;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+//using UnityEngine.UIElements;
+
+
+[RequireComponent(typeof(CharacterController))]
+public class NewPlayerController : NetworkBehaviour
+{
+    public Camera playerCamera;
+
+    private Vector3 _velocity;
+    private bool _jumpPressed;
+    public float GravityValue = -9.81f;
+
+    public float walkSpeed = 6f;
+    public float runSpeed = 12f;
+    public float jumpPower = 7f;
+    public float gravity = 9f;
+    public float lookSpeed = 2f;
+    public float curSpeedX;
+    public float curSpeedY;
+
+
+    private bool isSpeedLimited = false;
+    private float slowMultiplier = 0.3f;
+    private float lookXLimit = 45f;
+
+    Vector3 moveDirection = Vector3.zero;
+    float rotationX = 0;
+
+    private bool canMove = true;
+
+    private Vector3 originalCameraPosition;
+
+    CharacterController characterController;
+    Animator characterAnimator;
+
+
+    [Header("Role (Inspector Override)")]
+    [SerializeField] private bool useInspectorRole = true;                 // 임시/디버그용 스위치
+    [SerializeField] private PlayerRole inspectorRole = PlayerRole.Cleaner; // 인스펙터에서 선택
+
+    [Networked] public PlayerRole Role { get; private set; }               // 실제 네트워크 동기화되는 
+
+
+    // (임시) 서버가 스폰 시 인스펙터 값 적용 중이라면 그대로 유지
+    public void ServerSetRole(PlayerRole role)
+    {
+        if (HasStateAuthority) Role = role;
+    }
+
+    void Awake()
+    {
+        characterController = GetComponent<CharacterController>();
+        characterAnimator = GetComponent<Animator>();
+        if (playerCamera != null)
+            originalCameraPosition = playerCamera.transform.localPosition;
+
+    }
+
+    public override void Spawned()
+    {
+        characterAnimator = GetComponent<Animator>();
+        characterController = GetComponent<CharacterController>();
+
+        if (HasStateAuthority && useInspectorRole)
+            Role = inspectorRole;
+
+        // 내 플레이어의 카메라를 자식에서 찾기
+        if (playerCamera == null)
+            playerCamera = GetComponentInChildren<Camera>(true);
+
+        if (Object.HasInputAuthority)
+        {
+            // 로컬만 카메라 ON
+            playerCamera.gameObject.SetActive(true);
+            originalCameraPosition = playerCamera.transform.localPosition;
+
+            // 혹시 씬에 남아있는 SceneCamera가 있다면 OFF (선택)
+            var sceneCam = Camera.main;
+            if (sceneCam && sceneCam != playerCamera) sceneCam.gameObject.SetActive(false);
+
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            if (playerCamera) playerCamera.gameObject.SetActive(false);
+        }
+    }
+    private void Update()
+    {
+        if (!Object.HasInputAuthority) return;
+
+    }
+
+    public override void FixedUpdateNetwork()
+    {
+        if (GetInput(out PlayerInputData inputData))
+            Move(inputData);
+    }
+
+    private float targetPitch, currentPitch, pitchVel;
+
+    private void Move(PlayerInputData inputData)
+    {
+        Vector3 camForward = playerCamera.transform.forward;
+        camForward.y = 0f;
+        camForward.Normalize();
+
+        Vector3 camRight = playerCamera.transform.right;
+        camRight.y = 0f;
+        camRight.Normalize();
+
+        float speed = inputData.run ? runSpeed : walkSpeed;
+        if (isSpeedLimited) speed *= slowMultiplier;
+
+        curSpeedX = inputData.move.y * speed; // 앞/뒤
+        curSpeedY = inputData.move.x * speed; // 좌/우
+
+        Vector3 move = camForward * curSpeedX + camRight * curSpeedY;
+
+        // ✅ 점프/중력 적용 정리
+        if (characterController.isGrounded)
+        {
+            if (inputData.jump)
+            {
+                moveDirection.y = jumpPower;
+                characterAnimator.SetTrigger("jumpTrigger");
+            }
+            else
+            {
+                // 살짝 붙여 주기 (지면 접촉 유지용)
+                moveDirection.y = -1f;
+            }
+        }
+        else
+        {
+            // 공중이면 중력 적용
+            moveDirection.y -= gravity * Runner.DeltaTime;
+        }
+
+        move.y = moveDirection.y;
+
+        moveDirection = move;
+        characterController.Move(move * Runner.DeltaTime);
+
+        // ✅ 회전은 여기서만 적용 (권한 가진 클라)
+        if (Object.HasInputAuthority)
+        {
+            // Yaw(좌우) - 본체
+            transform.rotation *= Quaternion.Euler(0f, inputData.look.x * lookSpeed, 0f);
+
+            // Pitch(상하) - 카메라 목표값만 갱신 (실제 적용은 LateUpdate 보간)
+            targetPitch += -inputData.look.y * lookSpeed;
+            targetPitch = Mathf.Clamp(targetPitch, -lookXLimit, lookXLimit);
+        }
+
+        characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);
+    }
+
+    // ✅ 부드러운 화면을 위해 렌더 프레임에서만 카메라 pitch 보간 적용 (선택이지만 강추)
+    private void LateUpdate()
+    {
+        if (!Object || !Object.HasInputAuthority) return;
+        currentPitch = Mathf.SmoothDampAngle(currentPitch, targetPitch, ref pitchVel, 0.03f);
+        playerCamera.transform.localRotation = Quaternion.Euler(currentPitch, 0f, 0f);
+    }
+
+
+
+    public void SetSpeedLimit(bool value)
+    {
+        isSpeedLimited = value;
+    }
+
+    public void PlayPickUpCameraMove(Vector3 targetOffset, float duration)
+    {
+        //StopAllCoroutines();
+        StartCoroutine(CameraMoveRoutine(targetOffset, duration));
+    }
+
+    private IEnumerator CameraMoveRoutine(Vector3 targetOffset, float duration)
+    {
+        Vector3 startPos = playerCamera.transform.localPosition;
+        Vector3 endPos = originalCameraPosition + targetOffset;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            playerCamera.transform.localPosition = Vector3.Lerp(startPos, endPos, elapsed / duration);
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            playerCamera.transform.localPosition = Vector3.Lerp(endPos, originalCameraPosition, elapsed / duration);
+            yield return null;
+        }
+    }
+
+}

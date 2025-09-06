@@ -1281,6 +1281,53 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 543724531}
   m_CullTransparentMesh: 1
+--- !u!1 &629102149
+GameObject:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 629102151}
+  - component: {fileID: 629102150}
+  m_Layer: 0
+  m_Name: Fusion_PhotonBackgroundConnectionHandler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &629102150
+MonoBehaviour:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 629102149}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1222927710, guid: 7de3b8b9e1263ad479e2d0c4261b7646, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  DisconnectAfterKeepAlive: 0
+  KeepAliveInBackground: 60000
+  ApplyDontDestroyOnLoad: 1
+--- !u!4 &629102151
+Transform:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 629102149}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &661037792
 GameObject:
   m_ObjectHideFlags: 0
@@ -2323,7 +2370,7 @@ MonoBehaviour:
   lobbySceneAsset: {fileID: 102900000, guid: b61e356adf147b2409f1ad416b333ee8, type: 3}
   gameplaySceneName: GameScene_Test
   lobbySceneName: LobbyScene
-  playerPrefab: {fileID: 5215273449223240846, guid: 6d45a95b82d114e498ad1e0d07ca63ac, type: 3}
+  playerPrefab: {fileID: 8169066279810238208, guid: 761a0416e3e49de459c1cc182e40cdfa, type: 3}
   roomNameInput: {fileID: 1105185160}
   passwordInput: {fileID: 926799601}
   passwordPanel: {fileID: 1097663959}
@@ -6200,6 +6247,7 @@ GameObject:
   - component: {fileID: 1855942967}
   - component: {fileID: 1855942966}
   - component: {fileID: 1855942965}
+  - component: {fileID: 1855942968}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -6281,6 +6329,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1855942968
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1855942964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff3099531d511454f9f0a9f6842a608f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Target: {fileID: 0}
+  MouseSensitivity: 10
+  Offset: {x: 0, y: 1.8, z: 0}
 --- !u!1 &1977818824
 GameObject:
   m_ObjectHideFlags: 0
@@ -6692,3 +6755,4 @@ SceneRoots:
   - {fileID: 1148474208}
   - {fileID: 1849231272}
   - {fileID: 924165928}
+  - {fileID: 629102151}

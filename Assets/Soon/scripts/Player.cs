@@ -1,3 +1,4 @@
+using Fusion;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -32,6 +33,15 @@ public class Player : MonoBehaviour
 
     CharacterController characterController;
     Animator characterAnimator;
+
+    public struct PlayerInputData : INetworkInput
+    {
+        public Vector2 move;
+        public Vector2 look;
+        public bool jump;
+        public bool run;
+    }
+
     void Start()
     {
         characterAnimator = GetComponent<Animator>();
