@@ -2370,7 +2370,7 @@ MonoBehaviour:
   lobbySceneAsset: {fileID: 102900000, guid: b61e356adf147b2409f1ad416b333ee8, type: 3}
   gameplaySceneName: GameScene_Test
   lobbySceneName: LobbyScene
-  playerPrefab: {fileID: 8169066279810238208, guid: 761a0416e3e49de459c1cc182e40cdfa, type: 3}
+  playerPrefab: {fileID: 5503753318243494970, guid: 37b4229173c166748bb65aa9a5842ac2, type: 3}
   roomNameInput: {fileID: 1105185160}
   passwordInput: {fileID: 926799601}
   passwordPanel: {fileID: 1097663959}

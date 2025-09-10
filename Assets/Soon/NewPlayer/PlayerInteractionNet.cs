@@ -21,18 +21,13 @@ public class PlayerInteractionNet : NetworkBehaviour
     public override void Spawned()
     {
         _player = GetComponent<NewPlayerController>();
-        if (HasInputAuthority)
-        {
-            _cam = GetComponentInChildren<Camera>(true);
-            enabled = true;
-        }
-        else enabled = false;
+        _cam = GetComponentInChildren<Camera>(true);
+        if (_cam) _cam.gameObject.SetActive(HasInputAuthority);
     }
 
     void Update()
     {
         if (!HasInputAuthority) return;
-
         CheckInteractionLocal();
 
         if (Input.GetKeyDown(KeyCode.R))
@@ -157,9 +152,9 @@ public class PlayerInteractionNet : NetworkBehaviour
         if (Physics.Raycast(origin, Vector3.down, out var hit, 5f, trashGroundMask, QueryTriggerInteraction.Ignore))
             spawnPos = hit.point + Vector3.up * 0.02f; // z-fighting 방지 살짝 띄우기
 
-        Quaternion rot = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
+        float yaw = UnityEngine.Random.Range(0f, 360f);
+        Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
 
-        // 소유권은 요청 보낸 플레이어 쪽으로(원하면 바꿔도 됨)
         Runner.Spawn(prefab, spawnPos, rot, Object.InputAuthority);
     }
 }

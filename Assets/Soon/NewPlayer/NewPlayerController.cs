@@ -44,6 +44,8 @@ public class NewPlayerController : NetworkBehaviour
 
     [Networked] public PlayerRole Role { get; private set; }               // 실제 네트워크 동기화되는 
 
+    private float yaw;                 // 본체 Yaw
+    private float mouseXSensitivity = 0.2f; // 마우스 X 민감도(취향대로)
 
     // (임시) 서버가 스폰 시 인스펙터 값 적용 중이라면 그대로 유지
     public void ServerSetRole(PlayerRole role)
@@ -54,7 +56,8 @@ public class NewPlayerController : NetworkBehaviour
     void Awake()
     {
         characterController = GetComponent<CharacterController>();
-        characterAnimator = GetComponent<Animator>();
+        characterAnimator = GetComponentInChildren<Animator>(true);
+        if (characterAnimator == null) Debug.LogError("[Player] Animator not found (check hierarchy).");
         if (playerCamera != null)
             originalCameraPosition = playerCamera.transform.localPosition;
 
@@ -62,7 +65,7 @@ public class NewPlayerController : NetworkBehaviour
 
     public override void Spawned()
     {
-        characterAnimator = GetComponent<Animator>();
+        characterAnimator = GetComponentInChildren<Animator>(true);
         characterController = GetComponent<CharacterController>();
 
         if (HasStateAuthority && useInspectorRole)
@@ -89,6 +92,8 @@ public class NewPlayerController : NetworkBehaviour
         {
             if (playerCamera) playerCamera.gameObject.SetActive(false);
         }
+
+        yaw = transform.eulerAngles.y;
     }
     private void Update()
     {
@@ -150,12 +155,9 @@ public class NewPlayerController : NetworkBehaviour
         // ✅ 회전은 여기서만 적용 (권한 가진 클라)
         if (Object.HasInputAuthority)
         {
-            // Yaw(좌우) - 본체
-            transform.rotation *= Quaternion.Euler(0f, inputData.look.x * lookSpeed, 0f);
-
-            // Pitch(상하) - 카메라 목표값만 갱신 (실제 적용은 LateUpdate 보간)
-            targetPitch += -inputData.look.y * lookSpeed;
-            targetPitch = Mathf.Clamp(targetPitch, -lookXLimit, lookXLimit);
+            yaw += inputData.look.x * mouseXSensitivity;
+            if (yaw > 360f) yaw -= 360f; else if (yaw < -360f) yaw += 360f;
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
         }
 
         characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);

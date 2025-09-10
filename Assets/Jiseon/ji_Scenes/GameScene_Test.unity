@@ -17830,7 +17830,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01f4ac9d916df9443bcd8b442cac329c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  PlayerPrefab: {fileID: 8169066279810238208, guid: 761a0416e3e49de459c1cc182e40cdfa, type: 3}
+  PlayerPrefab: {fileID: 5503753318243494970, guid: 37b4229173c166748bb65aa9a5842ac2, type: 3}
   uiCanvas: {fileID: 1896347865}
   nameInputField: {fileID: 964489174}
 --- !u!4 &1596092285
