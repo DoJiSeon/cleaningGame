@@ -77,6 +77,20 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         runnerInsatance.JoinSessionLobby(SessionLobby.Shared, lobbyName);
     }
 
+
+    public void OnInput(NetworkRunner runner, NetworkInput input)
+    {
+        var data = new PlayerInputData
+        {
+            move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical")),
+            look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")),
+            jump = Input.GetButton("Jump"),
+            run = Input.GetKey(KeyCode.LeftShift),
+            NextEquipPressed = Input.GetKeyDown(KeyCode.E),   // E 키 → 다음 장비
+            PrevEquipPressed = Input.GetKeyDown(KeyCode.Q)   // Q 키 → 이전 장비
+    };
+        input.Set(data);
+    }
     // -------------------------------
     // 방 생성
     // -------------------------------
@@ -361,7 +375,6 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
     public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason) { }
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
-    public void OnInput(NetworkRunner runner, NetworkInput input) { }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
