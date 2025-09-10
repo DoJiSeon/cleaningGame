@@ -9,6 +9,13 @@ using UnityEngine;
 
 public class MeetingDirector : NetworkBehaviour
 {
+    [Header("회의 끝나면 씬 전환")]
+    [SerializeField] private bool changeSceneAfterMeeting = true;
+    [SerializeField] private float changeSceneDelay = 2.0f;     // 결과패널 보여줄 시간과 맞추기
+    [SerializeField] private Multiplayerchat chatManager;        // 인스펙터에 'chat manager' 드래그
+
+    private bool _sceneChangeTriggered;
+
     // === [추가] 공용 연출 훅 ===
     [Header("결과 연출")]
 
@@ -229,6 +236,9 @@ public class MeetingDirector : NetworkBehaviour
             Debug.Log("[Meeting] 내가 지목됨!");
             // TODO: 추방/관전 전환 처리
         }
+
+        if (changeSceneAfterMeeting)
+            StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
     }
 
     // === 컷씬 실행 RPC ===
@@ -268,6 +278,25 @@ public class MeetingDirector : NetworkBehaviour
         ShowFinalVoteBanner(meetingBannerText);
     }
 
+    // 씬전환
+    private IEnumerator CoChangeSceneViaChatManagerAfter(float sec)
+    {
+        if (_sceneChangeTriggered) yield break;   // 중복 방지
+        _sceneChangeTriggered = true;
+
+        yield return new WaitForSecondsRealtime(sec);
+
+        var cm = chatManager ? chatManager : FindObjectOfType<Multiplayerchat>(true);
+        if (cm != null)
+        {
+            // 버튼 없이도 동일 동작
+            cm.OnLeaveRoomButtonPressed();
+        }
+        else
+        {
+            Debug.LogWarning("[Meeting] chatManager(Multiplayerchat) 를 찾지 못해 씬 전환 실패");
+        }
+    }
 
     private IEnumerator CoShowResultPanelThenHide(float showSec)
     {
