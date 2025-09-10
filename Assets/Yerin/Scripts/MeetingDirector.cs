@@ -22,6 +22,12 @@ public class MeetingDirector : NetworkBehaviour
     [SerializeField] private TMP_Text resultDetailText;        // "(플레이어이름)은 방해자였습니다." 등
     [SerializeField] private TMP_Text resultAccusedNameText;   // "지목: Player 2" 같은 표시(원하면)
 
+    [Header("회의 배너")]
+    [SerializeField] private GameObject finalVoteBanner;   // 배너 루트(= FinalVoteBanner)
+    [SerializeField] private TMP_Text finalVoteText;       // 배너 안의 텍스트
+    [SerializeField] private string meetingBannerText = "최종 투표시간입니다";
+    [SerializeField] private string revoteBannerText = "재투표 시간입니다";
+
     [Header("재투표")]
     [SerializeField] private float revoteDuration = 15f; // 재투표 시간
 
@@ -70,6 +76,8 @@ public class MeetingDirector : NetworkBehaviour
             _uiTimerRoutine = StartCoroutine(CoUpdateTimersUI());
 
         if (Runner != null) Runner.AddCallbacks(new RunnerHooks(this));
+
+        HideFinalVoteBanner();
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
@@ -167,10 +175,25 @@ public class MeetingDirector : NetworkBehaviour
         }
     }
 
+    // === 회의 표시 ===
+    private void ShowFinalVoteBanner(string msg)
+    {
+        if (finalVoteText) finalVoteText.text = msg;
+        if (finalVoteBanner) finalVoteBanner.SetActive(true);
+    }
+
+    private void HideFinalVoteBanner()
+    {
+        if (finalVoteBanner) finalVoteBanner.SetActive(false);
+    }
+
     // === 결과 표시 RPC ===
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcEndMeeting_All(int accusedPlayerId, bool caughtSaboteur)
     {
+
+        HideFinalVoteBanner();
+
         _meetingOnCached = false;
         SetRoundTimerVisible(true);
 
@@ -241,7 +264,10 @@ public class MeetingDirector : NetworkBehaviour
 
         if (meetingUI) meetingUI.SetActive(true);
         voteUI?.Rebuild(Runner);
+
+        ShowFinalVoteBanner(meetingBannerText);
     }
+
 
     private IEnumerator CoShowResultPanelThenHide(float showSec)
     {
@@ -321,6 +347,8 @@ public class MeetingDirector : NetworkBehaviour
         voteUI?.RebuildWithWhitelist(Runner, whiteList);
 
         meetingDuration = durationSec;
+
+        ShowFinalVoteBanner(revoteBannerText);
     }
 
     // --- 로컬 유틸 ---
