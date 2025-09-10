@@ -2365,7 +2365,7 @@ MonoBehaviour:
   sessionListContentParent: {fileID: 12722158}
   sessionListEntryPrefab: {fileID: 7717861025995004143, guid: bd271f37676c1314988e5f0e2ff306f6, type: 3}
   gameplaySceneAsset: {fileID: 102900000, guid: fa834a2b238ad0e4b9604bc29ec5a9e4, type: 3}
-  lobbySceneAsset: {fileID: 102900000, guid: b61e356adf147b2409f1ad416b333ee8, type: 3}
+  lobbySceneAsset: {fileID: 102900000, guid: 044fad43748901e489141fdf651f9264, type: 3}
   gameplaySceneName: GameScene_Test
   lobbySceneName: LobbyScene
   playerPrefab: {fileID: 5215273449223240846, guid: 6d45a95b82d114e498ad1e0d07ca63ac, type: 3}
