@@ -3484,6 +3484,7 @@ MonoBehaviour:
   statusText: {fileID: 1300663123}
   timerText: {fileID: 321325713}
   playerCountText: {fileID: 1254522338}
+  roleMessageSeconds: 3
 --- !u!4 &934195248
 Transform:
   m_ObjectHideFlags: 0
@@ -5939,7 +5940,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01f4ac9d916df9443bcd8b442cac329c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  PlayerPrefab: {fileID: 5215273449223240846, guid: 6d45a95b82d114e498ad1e0d07ca63ac, type: 3}
+  PlayerPrefab: {fileID: 5503753318243494970, guid: 37b4229173c166748bb65aa9a5842ac2, type: 3}
   uiCanvas: {fileID: 1896347865}
   nameInputField: {fileID: 964489174}
 --- !u!4 &1596092285

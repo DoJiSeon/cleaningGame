@@ -22,10 +22,10 @@ public class NewPlayerController : NetworkBehaviour
     public float curSpeedX;
     public float curSpeedY;
 
-
     private bool isSpeedLimited = false;
     private float slowMultiplier = 0.3f;
     private float lookXLimit = 45f;
+    private bool isjumping = false;
 
     Vector3 moveDirection = Vector3.zero;
     float rotationX = 0;
@@ -36,7 +36,6 @@ public class NewPlayerController : NetworkBehaviour
 
     CharacterController characterController;
     Animator characterAnimator;
-
 
     [Header("Role (Inspector Override)")]
     [SerializeField] private bool useInspectorRole = true;                 // 임시/디버그용 스위치
@@ -130,16 +129,18 @@ public class NewPlayerController : NetworkBehaviour
         // ✅ 점프/중력 적용 정리
         if (characterController.isGrounded)
         {
-            if (inputData.jump)
+            if (inputData.jump && !isjumping)
             {
-                moveDirection.y = jumpPower;
-                characterAnimator.SetTrigger("jumpTrigger");
+                Debug.Log("점프 클릭");
+                //characterAnimator.SetTrigger("jumpTrigger");
+                characterAnimator.SetBool("isJump", true);
+                isjumping = true;
             }
             else
             {
-                // 살짝 붙여 주기 (지면 접촉 유지용)
-                moveDirection.y = -1f;
+                //moveDirection.y = -1f;
             }
+
         }
         else
         {
@@ -172,6 +173,11 @@ public class NewPlayerController : NetworkBehaviour
     }
 
 
+    void Jumping()
+    {
+        moveDirection.y = jumpPower;
+        isjumping = false;
+    }
 
     public void SetSpeedLimit(bool value)
     {

@@ -84,7 +84,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         {
             move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical")),
             look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")),
-            jump = Input.GetButton("Jump"),
+            jump = Input.GetKey(KeyCode.Space),
             run = Input.GetKey(KeyCode.LeftShift),
             NextEquipPressed = Input.GetKeyDown(KeyCode.E),   // E 키 → 다음 장비
             PrevEquipPressed = Input.GetKeyDown(KeyCode.Q)   // Q 키 → 이전 장비
