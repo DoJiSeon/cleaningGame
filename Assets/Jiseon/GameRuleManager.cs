@@ -23,7 +23,16 @@ public class GameRuleManager : NetworkBehaviour
 
 
     // 추가
-    public bool IsGameLive => GameStarted;
+    public bool IsGameLive
+    {
+        get
+        {
+            // Runner나 NetworkObject가 준비되지 않았으면 false 처리
+            if (Object == null || Object.Runner == null)
+                return false;
+            return GameStarted;
+        }
+    }
 
     private readonly List<PlayerInfo> _players = new();
     private readonly List<PlayerInfo> _saboteurs = new(); // Host 보관용
