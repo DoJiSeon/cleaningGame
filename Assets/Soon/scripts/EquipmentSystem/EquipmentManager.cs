@@ -9,11 +9,11 @@ public enum EquipmentState
     TrashMode  // 임포스터: 쓰레기 생성 모드 (손에 아무것도 없음)
 }
 
-public enum PlayerRole
-{
-    Citizen,
-    Imposter
-}
+//public enum PlayerRole
+//{
+//    Citizen,
+//    Imposter
+//}
 
 public class EquipmentManager : MonoBehaviour
 {
@@ -65,7 +65,7 @@ public class EquipmentManager : MonoBehaviour
     void Start()
     {
         availableEquipments = new List<EquipmentState>();
-        if (playerRole == PlayerRole.Citizen)
+        if (playerRole == PlayerRole.Cleaner)
         {
             availableEquipments.Add(EquipmentState.None);
             availableEquipments.Add(EquipmentState.Sponge);
