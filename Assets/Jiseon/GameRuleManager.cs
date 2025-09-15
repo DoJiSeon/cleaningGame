@@ -21,6 +21,10 @@ public class GameRuleManager : NetworkBehaviour
     [Networked] private bool GameStarted { get; set; }
     [Networked] private NetworkString<_32> StatusMessage { get; set; }
 
+
+    // 추가
+    public bool IsGameLive => GameStarted;
+
     private readonly List<PlayerInfo> _players = new();
     private readonly List<PlayerInfo> _saboteurs = new(); // Host 보관용
     private bool _uiReady;

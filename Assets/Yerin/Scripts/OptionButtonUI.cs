@@ -599,6 +599,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     private int _targetIndex = -1;          // 타겟 인덱스
     private int _penaltyIndex = 0;          // 제재 인덱스
 
+
     // ===================== 라이프사이클 =====================
     void Start()
     {
@@ -617,8 +618,10 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         BuildTargetList();            // 논리 목록
         UpdateTargetLabel();
 
-        if (Object.HasStateAuthority) // 호스트만 스케줄 시작
+        if (Object.HasStateAuthority && _wasLive)
             NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
+        else
+            NextOpenTimer = TickTimer.None; // 명시적으로 비활성
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
@@ -627,19 +630,54 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         if (runner != null) runner.RemoveCallbacks(this);
     }
 
+    private bool IsGameLive()
+    {
+        return GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+    }
+
+    // 게임 시작 전→후 전환 감지용
+    private bool _wasLive = false;
+
     public override void FixedUpdateNetwork()
     {
-        if (Object.HasStateAuthority && NextOpenTimer.Expired(Runner))
+        bool live = IsGameLive();
+
+        // 호스트만 스케줄 관리
+        if (Object.HasStateAuthority)
         {
-            // 회의 중이면 잠시 뒤 재검사
-            if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn)
+            // 게임이 아직 안 시작된 경우: 어떤 패널/타이머도 동작 금지
+            if (!live)
             {
-                NextOpenTimer = TickTimer.CreateFromSeconds(Runner, 1f);
+                // 혹시 열려 있으면 닫아주고
+                if (_phase != Phase.Closed)
+                    RpcClosePanel();
+
+                // 타이머 비활성 유지
+                NextOpenTimer = TickTimer.None;
+                _wasLive = false;
                 return;
             }
 
-            RpcOpenPanel(); // 모두 동시에 열기
-            NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
+            // 막 시작된 순간(전 프레임은 false, 지금 true): 타이머 스타트
+            if (!_wasLive && live)
+                NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
+
+            // 평상시 스케줄
+            if (NextOpenTimer.Expired(Runner))
+            {
+                // 회의 중이면 딜레이 재지정
+                if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn)
+                {
+                    NextOpenTimer = TickTimer.CreateFromSeconds(Runner, 1f);
+                }
+                else
+                {
+                    RpcOpenPanel(); // 모두 동시에 열기
+                    NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
+                }
+            }
+
+            _wasLive = true;
         }
     }
 
@@ -647,11 +685,26 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         if (_meeting == null) _meeting = FindObjectOfType<MeetingDirector>(true);
 
+        bool live = IsGameLive();
+
+
         // 회의 중엔 즉시 닫기
         if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn && _phase != Phase.Closed)
         {
             RpcClosePanel();
         }
+
+        if (!live)
+        {
+            if (_phase != Phase.Closed)
+                LocalClosePanelVisual(); // 시각적으로 닫아둠(호스트가 아니라도)
+
+            // 여기서 return 하면, 아래 패널 타이머/입력 처리 전부 안 돌아감
+            return;
+        }
+
+        // ▼ 여기부터는 게임 시작 후에만 동작
+
 
         // 패널 단계 타이머(연출)
         if (_phase == Phase.ChoosingTarget || _phase == Phase.ChoosingPenalty)
@@ -719,6 +772,11 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcOpenPanel()
     {
+
+        if (!IsGameLive())
+            return;
+
+
         // 상태 초기화
         _phase = Phase.ChoosingTarget;
         _localPanelTimer = timeLimit;

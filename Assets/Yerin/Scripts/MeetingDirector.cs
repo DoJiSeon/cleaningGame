@@ -9,6 +9,7 @@ using UnityEngine;
 
 public class MeetingDirector : NetworkBehaviour
 {
+
     [Header("회의 끝나면 씬 전환")]
     [SerializeField] private bool changeSceneAfterMeeting = true;
     [SerializeField] private float changeSceneDelay = 2.0f;     // 결과패널 보여줄 시간과 맞추기
@@ -72,6 +73,12 @@ public class MeetingDirector : NetworkBehaviour
     // UI 업데이트 루프
     private Coroutine _uiTimerRoutine;
 
+    private bool _wasLive = false;
+    private bool IsGameLiveNow()
+    {
+        return GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+    }
+
     // --- 라이프사이클 ---
     public override void Spawned()
     {
@@ -97,30 +104,49 @@ public class MeetingDirector : NetworkBehaviour
     {
         if (!Object.HasStateAuthority) return;
 
-        // 라운드 시간 종료 시 회의 조건 체크
+        bool live = IsGameLiveNow();
+
+        // 게임 시작 전: 아무 것도 돌지 않음
+        if (!live)
+        {
+            if (IsMeetingActive)
+            {
+                IsMeetingActive = false;
+                _votes.Clear();
+            }
+            RoundTimer = TickTimer.None;
+            _wasLive = false;
+            return;
+        }
+
+        // 게임 시작된 순간에만 타이머 스타트
+        if (!_wasLive && live)
+        {
+            RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+        }
+
+        // 라운드 타임아웃
         if (!IsMeetingActive && RoundTimer.Expired(Runner))
         {
             float percent = Mathf.Clamp01(SpawnManager.Instance?.GetDeSpawnPercentage() ?? 0f);
-            if (percent < requiredPercent)
-            {
-                StartMeeting_Server();
-            }
-            else
-            {
-                RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration); // 다음 라운드
-            }
+            if (percent < requiredPercent) StartMeeting_Server();
+            else RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
         }
 
-        // 회의 중 타임아웃 → 자동 마감
+        // 회의 타임아웃
         if (IsMeetingActive && MeetingTimer.Expired(Runner))
         {
             EndMeetingAndAnnounce_Server();
         }
+
+        _wasLive = true;
     }
 
     // --- 서버(호스트)에서 회의 시작 ---
     private void StartMeeting_Server()
     {
+        if (!IsGameLiveNow()) return; // 게임 전이면 무시
+
         IsMeetingActive = true;
         MeetingTimer = TickTimer.CreateFromSeconds(Runner, meetingDuration);
         _votes.Clear();
@@ -131,6 +157,10 @@ public class MeetingDirector : NetworkBehaviour
     // --- 서버(호스트)에서 회의 종료/발표 ---
     private void EndMeetingAndAnnounce_Server()
     {
+
+        if (!IsGameLiveNow()) return; // 게임 전이면 무시
+
+
         var tally = new Dictionary<PlayerRef, int>();
         foreach (var pair in _votes)
         {
@@ -477,6 +507,7 @@ public class MeetingDirector : NetworkBehaviour
     private void Update()
     {
         if (Runner == null) return;
+        if (!IsGameLiveNow()) return; // 게임 전에는 F1/F2 디버그키 무효화
 
         if (Object.HasStateAuthority)
         {
