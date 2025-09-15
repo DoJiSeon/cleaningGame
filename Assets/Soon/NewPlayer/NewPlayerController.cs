@@ -86,8 +86,10 @@ public class NewPlayerController : NetworkBehaviour
             var sceneCam = Camera.main;
             if (sceneCam && sceneCam != playerCamera) sceneCam.gameObject.SetActive(false);
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            // Cursor.lockState = CursorLockMode.Locked;
+            // Cursor.visible = false;
+
+            ApplyCursorByGameState();
         }
         else
         {
@@ -99,6 +101,12 @@ public class NewPlayerController : NetworkBehaviour
     private void Update()
     {
         if (!Object.HasInputAuthority) return;
+
+        // 게임 상태 전환 감지해서 커서 갱신
+        bool liveNow = GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+        if (liveNow != _lastLiveState)
+            ApplyCursorByGameState();
+
 
     }
 
@@ -232,5 +240,31 @@ public class NewPlayerController : NetworkBehaviour
             yield return null;
         }
     }
+
+    // 추가
+    // 게임 진행 여부 캐시(전/후 전환 감지용)
+    private bool _lastLiveState;
+
+    // 커서 토글 헬퍼
+    private void ApplyCursorByGameState()
+    {
+        bool live = GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+
+        if (live)
+        {
+            // 게임 시작 후: 커서 숨김 + 잠금
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            // 게임 시작 전: 커서 보임 + 잠금 해제
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        _lastLiveState = live;
+    }
+
 
 }
