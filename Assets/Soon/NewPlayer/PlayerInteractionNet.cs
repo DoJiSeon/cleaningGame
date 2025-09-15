@@ -11,6 +11,7 @@ public class PlayerInteractionNet : NetworkBehaviour
     private Interactable _current;
     public NewPlayerController _player;
     private Camera _cam;
+    [SerializeField] private Animator _animator;
 
     [Header("Trash (Prototype)")]
     [SerializeField] private GameObject[] trashPrefabs;   // NetworkObject가 붙은 프리팹들
@@ -22,6 +23,7 @@ public class PlayerInteractionNet : NetworkBehaviour
     {
         _player = GetComponent<NewPlayerController>();
         _cam = GetComponentInChildren<Camera>(true);
+        _animator = GetComponent<Animator>();
         if (_cam) _cam.gameObject.SetActive(HasInputAuthority);
     }
 
@@ -119,7 +121,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         // 거리 검증
         float max = playerReach + 0.75f;
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
-
+        _animator.SetTrigger("pickTrigger");
         interactable.Interact();
     }
 
@@ -155,6 +157,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         float yaw = UnityEngine.Random.Range(0f, 360f);
         Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
 
+        _animator.SetTrigger("pickTrigger");
         Runner.Spawn(prefab, spawnPos, rot, Object.InputAuthority);
     }
 }
