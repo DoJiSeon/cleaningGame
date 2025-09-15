@@ -24382,6 +24382,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ba829e1f5677e942af89bc14db0b7f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  changeSceneAfterMeeting: 1
+  changeSceneDelay: 2
+  chatManager: {fileID: 0}
   executionTimeline: {fileID: 0}
   vcam: {fileID: 0}
   resultPanelLocal: {fileID: 0}
@@ -124538,7 +124541,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 4
   m_TargetDisplay: 0
 --- !u!224 &1896347869
 RectTransform:
