@@ -110,6 +110,9 @@ public class NewPlayerController : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
+        if (!HasInputAuthority)
+            return;
+
         if (GetInput(out PlayerInputData inputData))
             Move(inputData);
     }
@@ -146,7 +149,7 @@ public class NewPlayerController : NetworkBehaviour
             }
             else
             {
-                //moveDirection.y = -1f;
+                moveDirection.y = -1f;
             }
 
         }
@@ -161,15 +164,23 @@ public class NewPlayerController : NetworkBehaviour
         moveDirection = move;
         characterController.Move(move * Runner.DeltaTime);
 
-        // ✅ 회전은 여기서만 적용 (권한 가진 클라)
-        if (Object.HasInputAuthority)
-        {
-            yaw += inputData.look.x * mouseXSensitivity;
-            if (yaw > 360f) yaw -= 360f; else if (yaw < -360f) yaw += 360f;
-            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-        }
-
         characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);
+
+        Vector2 input2D = inputData.move;
+        if (input2D.sqrMagnitude > 0.0001f && playerCamera)
+        {
+            float targetY = playerCamera.transform.eulerAngles.y;
+            Quaternion targetRot = Quaternion.Euler(0f, targetY, 0f);
+
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                targetRot,
+                540f * Runner.DeltaTime   // turnSpeed 사용해도 됨
+            );
+
+            // 본체 yaw 기준 유지
+            yaw = transform.eulerAngles.y;
+        }
     }
 
     // ✅ 부드러운 화면을 위해 렌더 프레임에서만 카메라 pitch 보간 적용 (선택이지만 강추)

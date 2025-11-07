@@ -10,6 +10,7 @@ public class PlayerSpawner : SimulationBehaviour, INetworkRunnerCallbacks
     public GameObject PlayerPrefab;
     public GameObject uiCanvas;
     public TMP_InputField nameInputField;
+    public Vector3 spawnPoint;
 
     private PlayerRef localPlayer;
     private NetworkRunner runner;
@@ -49,7 +50,7 @@ public class PlayerSpawner : SimulationBehaviour, INetworkRunnerCallbacks
     {
         if (localPlayer != null && runner != null)
         {
-            runner.Spawn(PlayerPrefab, new Vector3(0, 1, 0), Quaternion.identity, localPlayer,
+            runner.Spawn(PlayerPrefab, spawnPoint, Quaternion.identity, localPlayer,
                 (runner, obj) =>
                 {
                     obj.GetComponent<PlayerInfo>().SetPlayerName(nameInputField.text);

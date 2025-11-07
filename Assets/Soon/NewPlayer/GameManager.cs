@@ -6,8 +6,8 @@ using UnityEngine.SceneManagement;
 
 public struct PlayerInputData : INetworkInput
 {
-    public Vector2 move;
-    public Vector2 look;
+    public Vector3 move;
+    public Vector3 look;
     public bool jump;
     public bool run;
 
