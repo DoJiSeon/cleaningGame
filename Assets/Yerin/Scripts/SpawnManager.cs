@@ -52,11 +52,6 @@ public class SpawnManager : MonoBehaviour
     }
 
 
-    public float GetDeSpawnPercentage()
-    {
-        return (targetCount / (float)spawnedCount);
-    }
-
     private void UpdateUI()
     {
         float percentage = GetDeSpawnPercentage(); 
@@ -68,4 +63,20 @@ public class SpawnManager : MonoBehaviour
            
         }
     }
+
+    // SpawnManager.cs
+
+    public void ResetRoundCounts()
+    {
+        spawnedCount = 0;
+        targetCount = 0;
+        UpdateUI();
+    }
+
+    public float GetDeSpawnPercentage()
+    {
+        if (spawnedCount <= 0) return 0f;   // 분모 0 방지
+        return targetCount / (float)spawnedCount;
+    }
+
 }

@@ -1,17 +1,16 @@
-using System.Collections;
-using System.Collections.Generic;
+using Fusion;
 using UnityEngine;
 
-public class PlayerInventory : MonoBehaviour
+public class PlayerInventory : NetworkBehaviour
 {
-    public static PlayerInventory instance;
-    public bool HasKey { get; set; } = false;
+    // 네트워크로 동기화되는 키 보유 여부
+    [Networked] public NetworkBool LocalHasKey { get; private set; }
 
-    private void Awake()
+    // 서버(호스트)에서만 변경
+    public void Server_SetHasKey(bool value)
     {
-        if (instance == null)
-        {
-            instance = this;
-        }
+        if (!Object || !Object.HasStateAuthority) return;
+        LocalHasKey = value;
     }
+
 }

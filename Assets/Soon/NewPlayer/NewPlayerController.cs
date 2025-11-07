@@ -45,7 +45,6 @@ public class NewPlayerController : NetworkBehaviour
 
     private float yaw;                 // 본체 Yaw
     private float mouseXSensitivity = 0.2f; // 마우스 X 민감도(취향대로)
-    [SerializeField] private float turnSpeed = 540f; // 360~720 추천(°/s)
 
     // (임시) 서버가 스폰 시 인스펙터 값 적용 중이라면 그대로 유지
     public void ServerSetRole(PlayerRole role)
@@ -85,44 +84,40 @@ public class NewPlayerController : NetworkBehaviour
             var sceneCam = Camera.main;
             if (sceneCam && sceneCam != playerCamera) sceneCam.gameObject.SetActive(false);
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            // Cursor.lockState = CursorLockMode.Locked;
+            // Cursor.visible = false;
+
+            ApplyCursorByGameState();
         }
         else
         {
             if (playerCamera) playerCamera.gameObject.SetActive(false);
         }
+
+        yaw = transform.eulerAngles.y;
     }
     private void Update()
     {
         if (!Object.HasInputAuthority) return;
 
+        // 게임 상태 전환 감지해서 커서 갱신
+        bool liveNow = GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+        if (liveNow != _lastLiveState)
+            ApplyCursorByGameState();
+
+
     }
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasStateAuthority)
-            return;
-
-        if (GetInput(out PlayerInputData input))
-        {
-            // ① 마우스 X → 플레이어 Yaw 회전
-            yaw += input.look.x * mouseXSensitivity;
-            if (yaw > 360f) yaw -= 360f; else if (yaw < -360f) yaw += 360f;
-            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-
-            // ② 이동 처리
-            Move(input);
-        }
+        if (GetInput(out PlayerInputData inputData))
+            Move(inputData);
     }
 
     private float targetPitch, currentPitch, pitchVel;
 
     private void Move(PlayerInputData inputData)
     {
-        //yaw += inputData.look.x * mouseXSensitivity;
-        //transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-
         Vector3 camForward = playerCamera.transform.forward;
         camForward.y = 0f;
         camForward.Normalize();
@@ -142,18 +137,16 @@ public class NewPlayerController : NetworkBehaviour
         // ✅ 점프/중력 적용 정리
         if (characterController.isGrounded)
         {
-            isjumping = false;
             if (inputData.jump && !isjumping)
             {
                 Debug.Log("점프 클릭");
                 //characterAnimator.SetTrigger("jumpTrigger");
                 characterAnimator.SetBool("isJump", true);
-                moveDirection.y = jumpPower;
                 isjumping = true;
             }
             else
             {
-                moveDirection.y = -1f;
+                //moveDirection.y = -1f;
             }
 
         }
@@ -164,24 +157,19 @@ public class NewPlayerController : NetworkBehaviour
         }
 
         move.y = moveDirection.y;
+
         moveDirection = move;
         characterController.Move(move * Runner.DeltaTime);
 
-        characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);
-
-        Vector2 input2D = inputData.move;
-        if (input2D.sqrMagnitude > 0.0001f)
+        // ✅ 회전은 여기서만 적용 (권한 가진 클라)
+        if (Object.HasInputAuthority)
         {
-            float targetY = playerCamera.transform.eulerAngles.y; // 카메라 yaw
-            Quaternion targetRot = Quaternion.Euler(0f, targetY, 0f);
-
-            // ✅ 프레임/틱 독립적이고 직관적인 회전
-            transform.rotation = Quaternion.RotateTowards(
-                transform.rotation,
-                targetRot,
-                turnSpeed * Runner.DeltaTime
-            );
+            yaw += inputData.look.x * mouseXSensitivity;
+            if (yaw > 360f) yaw -= 360f; else if (yaw < -360f) yaw += 360f;
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
         }
+
+        characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);
     }
 
     // ✅ 부드러운 화면을 위해 렌더 프레임에서만 카메라 pitch 보간 적용 (선택이지만 강추)
@@ -193,11 +181,11 @@ public class NewPlayerController : NetworkBehaviour
     }
 
 
-    //void Jumping()
-    //{
-    //    moveDirection.y = jumpPower;
-    //    isjumping = false;
-    //}
+    void Jumping()
+    {
+        moveDirection.y = jumpPower;
+        isjumping = false;
+    }
 
     public void SetSpeedLimit(bool value)
     {
@@ -231,5 +219,31 @@ public class NewPlayerController : NetworkBehaviour
             yield return null;
         }
     }
+
+    // 추가
+    // 게임 진행 여부 캐시(전/후 전환 감지용)
+    private bool _lastLiveState;
+
+    // 커서 토글 헬퍼
+    private void ApplyCursorByGameState()
+    {
+        bool live = GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
+
+        if (live)
+        {
+            // 게임 시작 후: 커서 숨김 + 잠금
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            // 게임 시작 전: 커서 보임 + 잠금 해제
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        _lastLiveState = live;
+    }
+
 
 }
