@@ -36,4 +36,17 @@ public class ButtonPopupManager : MonoBehaviour
     {
         SceneManager.LoadScene(sceneName);
     }
+
+    public void QuitGame()
+    {
+        Debug.Log("게임 종료!");
+
+#if UNITY_EDITOR
+        // Unity 에디터에서 실행중일 때
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+            // 빌드된 게임에서
+            Application.Quit();
+#endif
+    }
 }
