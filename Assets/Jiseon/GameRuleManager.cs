@@ -198,13 +198,27 @@ public class GameRuleManager : NetworkBehaviour
             if (p.IsReady) readyClients++;
         }
 
+        // 혼자(호스트만)일 경우에도 바로 true 리턴
+        if (clientCount == 0)
+            return true;
+
         return clientCount > 0 && readyClients == clientCount;
     }
 
     public void UpdateStartButtonState()
     {
         if (!IsHost || startButton == null) return;
-        startButton.interactable = AreAllClientsReady();
+        //startButton.interactable = AreAllClientsReady();
+
+        // 플레이어가 1명(호스트뿐)이어도 시작 가능하게
+        if (_players.Count <= 1)
+        {
+            startButton.interactable = true;
+        }
+        else
+        {
+            startButton.interactable = AreAllClientsReady();
+        }
     }
 
     private void OnStartClicked()
