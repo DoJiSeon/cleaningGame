@@ -11,42 +11,44 @@ public enum EquipmentId : int
 
 public enum PlayerRole
 {
-    Cleaner = 0,    // Ã»¼ÒºÎ
-    Imposter = 1    // ¹æÇØÀÚ
+    Cleaner = 0,    // Ã»ï¿½Òºï¿½
+    Imposter = 1    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
 
 public class EquipManagerNet : NetworkBehaviour
 {
-    [Header("·ÎÄÃ Àåºñ ¿ÀºêÁ§Æ® ¸ÅÇÎ (ID -> GameObject)")]
+    [Header("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ (ID -> GameObject)")]
     [SerializeField] private GameObject handObj;
     [SerializeField] private GameObject spongeObj;
     [SerializeField] private GameObject trashThrowObj;
-    // ÇÊ¿äÇÏ¸é µñ¼Å³Ê¸®È­ °¡´É
+    // ï¿½Ê¿ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½Å³Ê¸ï¿½È­ ï¿½ï¿½ï¿½ï¿½
 
-    // ³×Æ®¿öÅ©·Î µ¿±âÈ­ÇÒ ÇöÀç Àåºñ
+    // ï¿½ï¿½Æ®ï¿½ï¿½Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     [Networked] public EquipmentId Equipped { get; private set; }
 
-    // ¡Ú ¿ªÇÒ/Çã¿ë¸ñ·Ï °ü·Ã
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     private NewPlayerController _pc;
     private PlayerRole _lastRole;
     private EquipmentId[] _allowed = new EquipmentId[] { EquipmentId.Hand, EquipmentId.Sponge };
 
-    private EquipmentId _lastEquipped; // ·ÎÄÃ Ä³½Ã(ºä °»½Å¿ë)
+    private EquipmentId _lastEquipped; // ï¿½ï¿½ï¿½ï¿½ Ä³ï¿½ï¿½(ï¿½ï¿½ ï¿½ï¿½ï¿½Å¿ï¿½)
 
 
     public override void Spawned()
     {
         _pc = GetComponent<NewPlayerController>();
 
-        RefreshAllowedByRole(force: true); // ¡Ú ½ºÆù ½Ã 1È¸ ¼¼ÆÃ
-        // ½ºÆù ½Ã ÇöÀç »óÅÂ´ë·Î ºä ¸ÂÃç³õ±â
+        RefreshAllowedByRole(force: true); // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ 1È¸ ï¿½ï¿½ï¿½ï¿½
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â´ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         ForceRefreshVisual();
     }
 
     public override void FixedUpdateNetwork()
     {
-        // StateAuthority¿¡¼­¸¸ ÀÔ·ÂÀ» Ã³¸®ÇØ¼­ »óÅÂ¸¦ ¹Ù²Ù´Â ÆÐÅÏ
+        RefreshAllowedByRole();
+
+        // StateAuthorityï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ï¿½Ø¼ï¿½ ï¿½ï¿½ï¿½Â¸ï¿½ ï¿½Ù²Ù´ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (HasStateAuthority && GetInput(out PlayerInputData input))
         {
             if (input.NextEquipPressed) EquipNext();
@@ -57,7 +59,7 @@ public class EquipManagerNet : NetworkBehaviour
 
     public override void Render()
     {
-        // ¸ðµç ³ëµå(¼ÒÀ¯/ÇÁ·Ï½Ã)¿¡¼­ ³×Æ®¿öÅ© °ª º¯È­¸¦ °¨ÁöÇØ ºä¸¸ °»½Å
+        // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½Ï½ï¿½)ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ ï¿½ï¿½È­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ä¸¸ ï¿½ï¿½ï¿½ï¿½
         if (_lastEquipped != Equipped)
         {
             if (HasInputAuthority)
@@ -68,10 +70,10 @@ public class EquipManagerNet : NetworkBehaviour
         }
     }
 
-    // ---- °ø°³ API (´Ù¸¥ ½ºÅ©¸³Æ®°¡ È£Ãâ) ----
+    // ---- ï¿½ï¿½ï¿½ï¿½ API (ï¿½Ù¸ï¿½ ï¿½ï¿½Å©ï¿½ï¿½Æ®ï¿½ï¿½ È£ï¿½ï¿½) ----
     public void RequestEquip(EquipmentId id)
     {
-        // ÀÔ·Â±ÇÇÑÀÌ Á÷Á¢ ¹Ù²Ü ¼ö ¾øÀ¸´Ï ¿äÃ» ¡æ »óÅÂ±ÇÇÑÀÌ Àû¿ë
+        // ï¿½Ô·Â±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ù²ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã» ï¿½ï¿½ ï¿½ï¿½ï¿½Â±ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (HasStateAuthority)
         {
             SetEquipped(id);
@@ -82,7 +84,7 @@ public class EquipManagerNet : NetworkBehaviour
         }
     }
 
-    // ---- ³»ºÎ ·ÎÁ÷ ----
+    // ---- ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ----
     private void RefreshAllowedByRole(bool force = false)
     {
         var role = _pc ? _pc.Role : PlayerRole.Cleaner;
@@ -94,7 +96,7 @@ public class EquipManagerNet : NetworkBehaviour
             ? new EquipmentId[] { EquipmentId.Hand, EquipmentId.Sponge, EquipmentId.TrashThrow }
             : new EquipmentId[] { EquipmentId.Hand, EquipmentId.Sponge };
 
-        // ÇöÀç Àåºñ°¡ Çã¿ë ¹ÛÀÌ¸é ¼­¹ö°¡ ¾ÈÀüÇÑ Àåºñ·Î ±³Ã¼
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼
         if (HasStateAuthority && System.Array.IndexOf(_allowed, Equipped) < 0)
             SetEquipped(_allowed[0]);
     }
@@ -112,8 +114,8 @@ public class EquipManagerNet : NetworkBehaviour
 
     private void EquipSlot(int index1Based)
     {
-        // ½½·ÔÀ» ¾²´Â °æ¿ì: index ¡æ EquipmentId ¸ÅÇÎÇØ¼­ SetEquipped È£Ãâ
-        // ¿¹½Ã·Î 1=Hand, 2=Sponge
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½: index ï¿½ï¿½ EquipmentId ï¿½ï¿½ï¿½ï¿½ï¿½Ø¼ï¿½ SetEquipped È£ï¿½ï¿½
+        // ï¿½ï¿½ï¿½Ã·ï¿½ 1=Hand, 2=Sponge
         var id = index1Based == 1 ? EquipmentId.Hand :
                  index1Based == 2 ? EquipmentId.Sponge : EquipmentId.None;
         SetEquipped(id);
@@ -121,12 +123,12 @@ public class EquipManagerNet : NetworkBehaviour
 
     private void SetEquipped(EquipmentId id)
     {
-        Equipped = id; // ³×Æ®¿öÅ© º¯¼ö¸¸ ¼öÁ¤ÇÏ¸é ³ª¸ÓÁö´Â Render()¿¡¼­ ºä ¹Ý¿µ
+        Equipped = id; // ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Render()ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ý¿ï¿½
     }
 
     private EquipmentId NextId(EquipmentId cur)
     {
-        // ½ÇÁ¦ º¸À¯ Àåºñ ¸ñ·Ï/½½·ÔÀ» º¸°í ¼øÈ¯
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯
         if (cur == EquipmentId.None) return EquipmentId.Hand;
         if (cur == EquipmentId.Hand) return EquipmentId.Sponge;
         if (cur == EquipmentId.Sponge) return EquipmentId.Hand;
@@ -148,14 +150,40 @@ public class EquipManagerNet : NetworkBehaviour
 
     private void ForceRefreshVisual()
     {
-        _lastEquipped = (EquipmentId)(-999); // Àý´ë °°Áö ¾Ê°Ô
+        _lastEquipped = (EquipmentId)(-999); // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê°ï¿½
         ApplyVisual(Equipped);
         _lastEquipped = Equipped;
     }
 
+    public void ApplyRole(PlayerInfo.Role sourceRole)
+    {
+        var mappedRole = sourceRole == PlayerInfo.Role.Saboteur
+            ? PlayerRole.Imposter
+            : PlayerRole.Cleaner;
+
+        ApplyRole(mappedRole);
+    }
+
+    public void ApplyRole(PlayerRole role)
+    {
+        if (_pc == null)
+            _pc = GetComponent<NewPlayerController>();
+
+        _pc?.ServerSetRole(role);
+
+        RefreshAllowedByRole(force: true);
+
+        if (HasStateAuthority && _allowed.Length > 0 && System.Array.IndexOf(_allowed, Equipped) < 0)
+        {
+            SetEquipped(_allowed[0]);
+        }
+
+        ForceRefreshVisual();
+    }
+
     private void ApplyVisual(EquipmentId id)
     {
-        // ¿©±â¼­´Â "Ç¥½Ã¸¸" Ã¥ÀÓÁø´Ù (³×Æ®¿öÅ© X, ·ÎÄÃ Àü¿ë)
+        // ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ "Ç¥ï¿½Ã¸ï¿½" Ã¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Æ®ï¿½ï¿½Å© X, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         if (handObj) handObj.SetActive(id == EquipmentId.Hand);
         if (spongeObj) spongeObj.SetActive(id == EquipmentId.Sponge);
         if (trashThrowObj) trashThrowObj.SetActive(id == EquipmentId.TrashThrow);

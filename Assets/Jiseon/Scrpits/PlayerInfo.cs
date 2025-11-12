@@ -29,7 +29,7 @@ public class PlayerInfo : NetworkBehaviour
     [Networked, OnChangedRender(nameof(OnReadyStateChanged))]
     public NetworkBool IsReady { get; private set; }
 
-    // ¿ªÇÒ ³×Æ®¿öÅ© º¯¼ö
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½
     [Networked, OnChangedRender(nameof(OnRoleChangedRender))]
     public Role PlayerRole { get; private set; }
 
@@ -47,7 +47,7 @@ public class PlayerInfo : NetworkBehaviour
         if (healthBar != null)
             healthBar.SetMaxHealth(NetworkedHealth);
 
-        // È£½ºÆ®´Â Ready ¹öÆ° ¼û±è, Å¬¶ó´Â Ç¥½Ã
+        // È£ï¿½ï¿½Æ®ï¿½ï¿½ Ready ï¿½ï¿½Æ° ï¿½ï¿½ï¿½ï¿½, Å¬ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
         if (HasInputAuthority && readyButton != null && !_uiWired)
         {
             if (!IsHost)
@@ -133,21 +133,29 @@ public class PlayerInfo : NetworkBehaviour
         if (_grm) _grm.UpdateStartButtonState();
     }
 
-    // Host°¡ ¿ªÇÒ ¼¼ÆÃÀ» ½ÃµµÇÒ ¶§: ³»°¡ StateAuthority¸é Á÷Á¢ ¼¼ÆÃ, ¾Æ´Ï¸é StateAuthority¿¡°Ô RPC ¿äÃ»
+    // Hostï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½ï¿½ï¿½ ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ StateAuthorityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½, ï¿½Æ´Ï¸ï¿½ StateAuthorityï¿½ï¿½ï¿½ï¿½ RPC ï¿½ï¿½Ã»
     public void SetRoleServer(Role role)
     {
-        if (HasStateAuthority) PlayerRole = role;
-        else RpcSetRole(role);
+        if (HasStateAuthority)
+        {
+            PlayerRole = role;
+            ApplyRoleToEquip(role);
+        }
+        else
+        {
+            RpcSetRole(role);
+        }
     }
 
-    // °¢ ¿ÀºêÁ§Æ®ÀÇ StateAuthority°¡ ¿ªÇÒÀ» ±â·Ï
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ StateAuthorityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RpcSetRole(Role role)
     {
         PlayerRole = role;
+        ApplyRoleToEquip(role);
     }
 
-    // °³ÀÎ ¾È³» ¸Þ½ÃÁö: ÀÌ ¿ÀºêÁ§Æ®ÀÇ InputAuthority¿¡°Ô¸¸ Àü¼Û
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½È³ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½: ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ InputAuthorityï¿½ï¿½ï¿½Ô¸ï¿½ ï¿½ï¿½ï¿½ï¿½
     [Rpc(RpcSources.All, RpcTargets.InputAuthority)]
     public void RpcShowRoleMessage(Role role, float seconds)
     {
@@ -191,13 +199,20 @@ public class PlayerInfo : NetworkBehaviour
 
     void OnRoleChangedRender()
     {
-        // ÇÊ¿ä ½Ã ¿ªÇÒº° ·ÎÄÃ ¿¬ÃâÀ» ¿©±â¼­
+        // ï¿½Ê¿ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Òºï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­
         // if (nameDisplayTMP) nameDisplayTMP.color = PlayerRole == Role.Saboteur ? new Color(1f,0.5f,0.5f) : Color.white;
     }
 
     void ResolveManager()
     {
         if (!_grm) _grm = FindObjectOfType<GameRuleManager>(true);
+    }
+
+    private void ApplyRoleToEquip(Role role)
+    {
+        var equip = GetComponent<EquipManagerNet>();
+        if (equip != null)
+            equip.ApplyRole(role);
     }
 
     void OnDisable()

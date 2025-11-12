@@ -23,7 +23,7 @@ public class PlayerInteractionNet : NetworkBehaviour
     {
         _player = GetComponent<NewPlayerController>();
         _cam = GetComponentInChildren<Camera>(true);
-        _animator = GetComponent<Animator>();
+        _animator = GetComponentInChildren<Animator>(true);
         if (_cam) _cam.gameObject.SetActive(HasInputAuthority);
     }
 

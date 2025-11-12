@@ -140,12 +140,18 @@ public class NewPlayerController : NetworkBehaviour
         // ✅ 점프/중력 적용 정리
         if (characterController.isGrounded)
         {
-            if (inputData.jump && !isjumping)
+            if (isjumping || characterAnimator.GetBool("isJump"))
+            {
+                characterAnimator.SetBool("isJump", false); // <-- characterAnimator 사용
+                isjumping = false;
+            }
+
+            if (inputData.jump) // 점프 입력
             {
                 Debug.Log("점프 클릭");
-                //characterAnimator.SetTrigger("jumpTrigger");
-                characterAnimator.SetBool("isJump", true);
+                characterAnimator.SetBool("isJump", true);    // <-- characterAnimator 사용
                 isjumping = true;
+                Jumping(); // <-- 점프 로직 호출 (이게 빠져있던 것 같습니다)
             }
             else
             {
@@ -164,7 +170,8 @@ public class NewPlayerController : NetworkBehaviour
         moveDirection = move;
         characterController.Move(move * Runner.DeltaTime);
 
-        characterAnimator.SetFloat("speed", new Vector3(curSpeedX, 0f, curSpeedY).magnitude);
+        float currentSpeed = new Vector3(curSpeedX, 0f, curSpeedY).magnitude;
+        characterAnimator.SetFloat("speed", currentSpeed);
 
         Vector2 input2D = inputData.move;
         if (input2D.sqrMagnitude > 0.0001f && playerCamera)
@@ -195,7 +202,7 @@ public class NewPlayerController : NetworkBehaviour
     void Jumping()
     {
         moveDirection.y = jumpPower;
-        isjumping = false;
+        //isjumping = false;
     }
 
     public void SetSpeedLimit(bool value)

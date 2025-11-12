@@ -59080,6 +59080,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: UICanvas
       objectReference: {fileID: 0}
+    - target: {fileID: 592902163338234865, guid: 18cdf619067fe38479fab44d523d55d8, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1180571084587789670, guid: 18cdf619067fe38479fab44d523d55d8, type: 3}
       propertyPath: m_Color.b
       value: 1
