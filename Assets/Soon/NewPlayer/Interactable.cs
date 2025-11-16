@@ -6,8 +6,11 @@ using UnityEngine.Events;
 public class Interactable : NetworkBehaviour
 {
     public string message;
-    public UnityEvent onInteraction;   // FX/»ç¿îµå/¾Ö´Ï¸¸ ¿¬°á (Àı´ë Interact() ¿¬°á ±İÁö)
+    public UnityEvent onInteraction;   // FX/ï¿½ï¿½ï¿½ï¿½/ï¿½Ö´Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Interact() ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     public Renderer MyRenderer;
+
+    // RPC ì—°ì¶œ ì¤‘ UnityEventê°€ ë‹¤ì‹œ Interact()ë¥¼ í˜¸ì¶œí•˜ì—¬ ì¬ê·€ë˜ëŠ” ê²ƒì„ ë§‰ê¸° ìœ„í•œ ê°€ë“œ
+    private bool _suppressInteractWhileFx;
 
     Outline outline;
 
@@ -17,55 +20,82 @@ public class Interactable : NetworkBehaviour
         DisableOutline();
     }
 
-    // ·ÎÄÃ¿¡¼­ ´­¸² ¡æ ¼­¹ö¿¡ Ã³¸® ¿äÃ»
+    // ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½Ã»
     public void Interact()
     {
+        if (_suppressInteractWhileFx) return;
         var no = GetComponent<NetworkObject>();
+        if (no == null) no = GetComponentInParent<NetworkObject>();
         if (no != null)
-            RPC_RequestInteract(no.Id);   // ¡Ú ÀÌº¥Æ® È£Ãâ ¾øÀ½
+            RPC_RequestInteract(no.Id);   // ï¿½ï¿½ ï¿½Ìºï¿½Æ® È£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     }
 
-    // Å¬¶ó/¼­¹ö ´©±¸³ª È£Ãâ °¡´É, Ã³¸®ÀÚ´Â StateAuthority
+    // Å¬ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½, Ã³ï¿½ï¿½ï¿½Ú´ï¿½ StateAuthority
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RPC_RequestInteract(NetworkId targetId, RpcInfo _ = default)
     {
-        // 1) ¼­¹ö¿¡¼­ ´ë»ó Ã£±â
+        // 1) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½
         var obj = Runner.FindObject(targetId);
-        if (obj == null) return;
+        if (obj == null)
+        {
+            Debug.LogWarning($"[Interactable] RPC_RequestInteract: target not found {targetId}");
+            return;
+        }
 
-        //// 2) ¿äÃ» º¸³½ ÇÃ·¹ÀÌ¾î °¡Á®¿À±â
+        //// 2) ï¿½ï¿½Ã» ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         //var playerObj = Runner.GetPlayerObject(_.Source);
         //if (playerObj == null) return;
 
-        // 3) ÇÃ·¹ÀÌ¾îÀÇ EquipManagerNet È®ÀÎ
+        // 3) ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ï¿½ï¿½ EquipManagerNet È®ï¿½ï¿½
         //var equip = playerObj.GetComponent<EquipManagerNet>();
         //if (equip == null) return;
 
         //if (equip.Equipped != EquipmentId.Hand)
         //{
-        //    // Hand°¡ ¾Æ´Ï¸é ¹«½Ã (¿øÇÏ¸é ·Î±×/UI ÇÇµå¹é)
-        //    Debug.Log("Hand ¾Æ´Ô");
+        //    // Handï¿½ï¿½ ï¿½Æ´Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½Î±ï¿½/UI ï¿½Çµï¿½ï¿½)
+        //    Debug.Log("Hand ï¿½Æ´ï¿½");
         //    return;
             
         //}
 
 
-        // ¸ğµç Å¬¶ó¿¡¼­ ¿¬Ãâ(ÀÌº¥Æ®) ¸ÕÀú
+        // ï¿½ï¿½ï¿½ Å¬ï¿½ó¿¡¼ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½Ìºï¿½Æ®) ï¿½ï¿½ï¿½ï¿½
         RPC_PlayFX(targetId);
-        // ¸ğµç Å¬¶ó¿¡¼­ ÆäÀÌµå ½ÃÀÛ
+        // ï¿½ï¿½ï¿½ Å¬ï¿½ó¿¡¼ï¿½ ï¿½ï¿½ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½
         RPC_PlayFade(targetId, 0.02f);
-        // ÆäÀÌµå ½Ã°£ Áö³­ ÈÄ despawn
-        StartCoroutine(DespawnAfterDelay(targetId, 1.0f));
+        // ï¿½ï¿½ï¿½Ìµï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ despawn
+        // ì¬ìƒí˜¸ì‘ìš© ë°©ì§€: ì¦‰ì‹œ ì½œë¼ì´ë” ë¹„í™œì„±í™”
+        try
+        {
+            foreach (var col in obj.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
+        }
+        catch { }
+
+        StartCoroutine(DespawnAfterDelay(targetId, 0.5f));
     }
 
     private IEnumerator DespawnAfterDelay(NetworkId targetId, float delay)
     {
         yield return new WaitForSeconds(delay);
         var obj = Runner.FindObject(targetId);
-        if (obj != null) Runner.Despawn(obj);
+        if (obj == null)
+        {
+            Debug.LogWarning($"[Interactable] DespawnAfterDelay: target already null {targetId}");
+            yield break;
+        }
+        if (Runner)
+        {
+            Debug.Log($"[Interactable] Despawning {obj.name} ({targetId})");
+            Runner.Despawn(obj);
+        }
+        else
+        {
+            Debug.LogWarning("[Interactable] DespawnAfterDelay: Runner missing");
+        }
     }
 
-    // ¿¬Ãâ(ÀÌº¥Æ®)À» ³×Æ®¿öÅ©·Î ºê·ÎµåÄ³½ºÆ®
+    // ï¿½ï¿½ï¿½ï¿½(ï¿½Ìºï¿½Æ®)ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å©ï¿½ï¿½ ï¿½ï¿½Îµï¿½Ä³ï¿½ï¿½Æ®
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_PlayFX(NetworkId targetId)
     {
@@ -73,8 +103,20 @@ public class Interactable : NetworkBehaviour
         if (!obj) return;
 
         var it = obj.GetComponent<Interactable>();
-        // ¡Ú ¿©±â¼­¸¸ onInteraction È£Ãâ (Àı´ë Interact() È£Ãâ ±İÁö)
-        it?.onInteraction?.Invoke();
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ onInteraction È£ï¿½ï¿½
+        // ì£¼ì˜: UnityEventê°€ Interact()ë¥¼ ë‹¤ì‹œ í˜¸ì¶œí•˜ë„ë¡ ì—°ê²°ë˜ì–´ ìˆì„ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ì¬ê·€ ë°©ì§€ ê°€ë“œ
+        if (it != null)
+        {
+            it._suppressInteractWhileFx = true;
+            try
+            {
+                it.onInteraction?.Invoke();
+            }
+            finally
+            {
+                it._suppressInteractWhileFx = false;
+            }
+        }
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
@@ -157,13 +199,13 @@ public class Interactable : NetworkBehaviour
 
 //            if (playerSponge == null)
 //            {
-//                Debug.LogWarning("½ºÆİÁö°¡ ¾ø½À´Ï´Ù.");
+//                Debug.LogWarning("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.");
 //                return;
 //            }
 
 //            if (playerSponge.isDirty)
 //            {
-//                Debug.Log("Ã»¼Ò ºÒ°¡(½ºÆİÁö ´õ·¯¿ò)");
+//                Debug.Log("Ã»ï¿½ï¿½ ï¿½Ò°ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)");
 //                return;
 //            }
 
@@ -179,11 +221,11 @@ public class Interactable : NetworkBehaviour
 //        if (playerSponge != null && playerSponge.isDirty)
 //        {
 //            playerSponge.WashSponge();
-//            Debug.Log("ÇÃ·¹ÀÌ¾îÀÇ ½ºÆİÁö¸¦ ¾çµ¿ÀÌ¿¡¼­ ¼¼Ã´Çß½À´Ï´Ù.");
+//            Debug.Log("ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½çµ¿ï¿½Ì¿ï¿½ï¿½ï¿½ ï¿½ï¿½Ã´ï¿½ß½ï¿½ï¿½Ï´ï¿½.");
 //        }
 //        else
 //        {
-//            Debug.Log("¼¼Ã´ÇÒ ½ºÆİÁö°¡ ¾ø°Å³ª ±ú²ıÇÕ´Ï´Ù.");
+//            Debug.Log("ï¿½ï¿½Ã´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Å³ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.");
 //        }
 //    }
 

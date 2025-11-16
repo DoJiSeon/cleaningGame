@@ -21,6 +21,8 @@ public class GameRuleManager : NetworkBehaviour
     [Networked] private bool GameStarted { get; set; }
     [Networked] private NetworkString<_32> StatusMessage { get; set; }
 
+    // 게임코어 진행상태
+    [Networked] private int GameCoreCount { get; set; }
 
     // 추가
     public bool IsGameLive
@@ -256,6 +258,9 @@ public class GameRuleManager : NetworkBehaviour
 
         // 역할 배정 및 개별 안내
         AssignRolesAndNotify();
+
+        // 게임코어 초기화
+        GameCoreCount = 0;
     }
 
     private void AssignRolesAndNotify()
@@ -307,5 +312,42 @@ public class GameRuleManager : NetworkBehaviour
                 return p;
         }
         return null;
+    }
+
+    // === Game Core API (서버 전용) ===
+    public void AddGameCore_Server()
+    {
+        if (!IsHost) return;
+        if (!GameStarted) return;
+
+        GameCoreCount = GameCoreCount + 1;
+
+        // 클라이언트에 현 카운트 안내(선택)
+        RpcNotifyGameCoreProgress_All(GameCoreCount);
+
+        if (GameCoreCount >= 3)
+        {
+            // 클리너 승리 브로드캐스트
+            RpcAnnounceCleanerWin_All();
+
+            // 게임 정지(간단히 표시만 하고 타이머/상태를 멈추고 싶다면 아래 해제)
+            GameStarted = false;
+            GameTimer = TickTimer.None;
+        }
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcNotifyGameCoreProgress_All(int count)
+    {
+        // 로컬 상태 텍스트에 잠깐 표시
+        ShowLocalStatus($"게임코어 {count}/3", 1.5f);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcAnnounceCleanerWin_All()
+    {
+        StatusMessage = "Cleaner 승리!";
+        ShowLocalStatus("Cleaner 승리!", 3f);
+        if (timerText) timerText.text = "끝";
     }
 }

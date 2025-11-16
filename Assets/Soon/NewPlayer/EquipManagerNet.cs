@@ -50,7 +50,10 @@ public class EquipManagerNet : NetworkBehaviour
             // 방법 A: 직접 UI를 찾아서 업데이트 (간단한 방법)
             if (PlayerHudUI.Instance != null)
             {
+                // 초기 아이콘 동기화
                 PlayerHudUI.Instance.UpdateEquipmentIcon(Equipped);
+                // 이후 장비 변경 이벤트에 UI 갱신을 구독
+                OnEquipChanged += PlayerHudUI.Instance.UpdateEquipmentIcon;
             }
         }
     }
@@ -92,6 +95,15 @@ public class EquipManagerNet : NetworkBehaviour
             }
 
             _lastEquipped = Equipped;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // UI 인스턴스가 존재하면 구독 해제
+        if (HasInputAuthority && PlayerHudUI.Instance != null)
+        {
+            OnEquipChanged -= PlayerHudUI.Instance.UpdateEquipmentIcon;
         }
     }
 
