@@ -1,195 +1,207 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
-using Fusion; // Fusion ³×ÀÓ½ºÆäÀÌ½º ÇÊ¼ö
+using Fusion; 
 
-// MonoBehaviour°¡ ¾Æ´Ï¶ó NetworkBehaviour¿©¾ß Runner¿¡ Á¢±Ù °¡´ÉÇÕ´Ï´Ù.
 public class RandomObjectSpawner : NetworkBehaviour
 {
-    [Header("½ºÆù ¸®¼Ò½º")]
-    public GameObject[] myObjects;           // NetworkObject°¡ ºÙÀº ÇÁ¸®ÆÕ
-    public Transform parentObject;           // À§Ä¡ ±âÁØÁ¡
+    [Header("ìŠ¤í° ë¦¬ì†ŒìŠ¤")]
+    public GameObject[] myObjects;
 
-    [Header("½ºÆù ¼³Á¤")]
-    [SerializeField] public float yFixedValue = -9.5f;
-    [SerializeField] private int spawnCount = 5;
+    [Tooltip("Floor íƒ€ì¼ë“¤ì˜ ìµœìƒìœ„ ë¶€ëª¨ ì˜¤ë¸Œì íŠ¸")]
+    public Transform parentObject;
 
-    private readonly List<Vector3> spawnPositions = new List<Vector3>();
+    [Header("ìŠ¤í° ì„¤ì •")]
+    [SerializeField] private float yFixedValue = -9.5f;
+    [SerializeField] private int spawnCount = 50;
 
-    // Start() ´ë½Å Spawned()¸¦ »ç¿ëÇÕ´Ï´Ù.
+    [Header("ì½œë¼ì´ë” ëœë¤ ìŠ¤í° ì„¤ì •")]
+    [Tooltip("ì½œë¼ì´ë” ê²½ê³„ì—ì„œ ì•ˆìª½ ì—¬ë°±")]
+    [SerializeField] private float edgeMargin = 0.3f;
+
+    [Header("TrashItem ìë™ ì¶”ê°€")]
+    [Tooltip("ìƒì„±ëœ ì˜¤ë¸Œì íŠ¸ì— TrashItem ìŠ¤í¬ë¦½íŠ¸ ìë™ ì¶”ê°€")]
+    [SerializeField] private bool autoAddTrashComponent = true;
+
+    private List<Collider> floorColliders = new List<Collider>();
+
+    // Start() ï¿½ï¿½ï¿½ï¿½ Spawned()ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
     public override void Spawned()
     {
-        // ¡Ú °¡Àå Áß¿ä: ¹æÀå(StateAuthority)¸¸ ¿ÀºêÁ§Æ®¸¦ »ı¼ºÇØ¾ß ÇÔ
-        // Å¬¶óÀÌ¾ğÆ®¸¶´Ù °¢ÀÚ »ı¼ºÇÏ¸é ¿ÀºêÁ§Æ®°¡ 2¹è, 3¹è·Î Áßº¹µË´Ï´Ù.
-        //if (!HasStateAuthority) return;
+        if (!ValidateSetup())
+            return;
 
-        if (!parentObject)
+        CollectFloorColliders();
+
+        if (floorColliders.Count == 0)
         {
-            Debug.LogError("[Spawner] parentObject°¡ ºñ¾îÀÖ½À´Ï´Ù.");
+            Debug.LogError("[Spawner] ì‚¬ìš© ê°€ëŠ¥í•œ ì½œë¼ì´ë”ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤!", this);
             return;
         }
 
-        spawnPositions.Clear();
-        foreach (Transform child in parentObject)
-        {
-            spawnPositions.Add(child.position);
-        }
-
-        if (spawnPositions.Count == 0) return;
-
-        SpawnObjects(spawnCount);
+        SpawnObjectsOnStart(spawnCount);
     }
 
-    void SpawnObjects(int count)
+    bool ValidateSetup()
     {
-        int created = 0;
+        if (!parentObject)
+        {
+            Debug.LogError("[Spawner] parentObjectê°€ í• ë‹¹ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.", this);
+            return false;
+        }
+
+        if (myObjects == null || myObjects.Length == 0)
+        {
+            Debug.LogError("[Spawner] myObjects ë°°ì—´ì´ ë¹„ì–´ìˆìŠµë‹ˆë‹¤.", this);
+            return false;
+        }
+
+        for (int i = 0; i < myObjects.Length; i++)
+        {
+            if (!myObjects[i])
+            {
+                Debug.LogError($"[Spawner] myObjects[{i}]ê°€ nullì…ë‹ˆë‹¤.", this);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void CollectFloorColliders()
+    {
+        floorColliders.Clear();
+
+        Collider[] allColliders = parentObject.GetComponentsInChildren<Collider>();
+
+        foreach (Collider col in allColliders)
+        {
+            if (col.gameObject.activeSelf && col.enabled)
+            {
+                floorColliders.Add(col);
+            }
+        }
+
+        Debug.Log($"[Spawner] {floorColliders.Count}ê°œì˜ ì½œë¼ì´ë” ë°œê²¬, {spawnCount}ê°œ ìƒì„± ì˜ˆì •", this);
+    }
+
+    void SpawnObjectsOnStart(int count)
+    {
+        int successCount = 0;
+
         for (int i = 0; i < count; i++)
         {
-            if (SpawnRandomObject()) created++;
+            if (SpawnRandomObjectInRandomCollider())
+                successCount++;
         }
-        Debug.Log($"[Spawner] ¼­¹ö ½ºÆù ¿Ï·á: {created}/{count}");
+
+        Debug.Log($"[Spawner] ìƒì„± ì™„ë£Œ: {successCount}/{count}", this);
     }
 
-    bool SpawnRandomObject()
+    bool SpawnRandomObjectInRandomCollider()
     {
-        if (spawnPositions.Count == 0 || myObjects == null || myObjects.Length == 0) return false;
+        if (floorColliders.Count == 0)
+            return false;
 
+        // ëœë¤ ì½œë¼ì´ë” ì„ íƒ
+        Collider randomCollider = floorColliders[Random.Range(0, floorColliders.Count)];
+
+        // ì½œë¼ì´ë” ë‚´ë¶€ ëœë¤ ìœ„ì¹˜
+        Vector3 spawnPos = GetRandomPointInsideCollider(randomCollider);
+
+        // ëœë¤ í”„ë¦¬íŒ¹ ì„ íƒ
         int prefabIndex = Random.Range(0, myObjects.Length);
-        int posIndex = Random.Range(0, spawnPositions.Count);
-
-        Vector3 basePos = spawnPositions[posIndex];
-        // À§Ä¡ °è»ê
-        Vector3 spawnPos = new Vector3(basePos.x, yFixedValue, basePos.z);
-
         GameObject prefab = myObjects[prefabIndex];
-        if (!prefab) return false;
 
         try
         {
-            // ¡Ú ÇÙ½É ¼öÁ¤: Instantiate -> Runner.Spawn
-            // ÀÌ·¸°Ô ÇØ¾ß ¸ğµç Å¬¶óÀÌ¾ğÆ® µ¿±âÈ­µÇ°í NetworkId°¡ ¹ß±ŞµË´Ï´Ù.
-            NetworkObject no = Runner.Spawn(prefab, spawnPos, Quaternion.identity, null);
+            // ì˜¤ë¸Œì íŠ¸ ìƒì„±
+            GameObject spawnedObject = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
+            spawnedObject.name = $"{prefab.name}_{randomCollider.gameObject.name}";
 
-            // (¼±ÅÃ) Hierarchy Á¤¸®¸¦ À§ÇØ ºÎ¸ğ ¼³Á¤ÀÌ ÇÊ¿äÇÏ´Ù¸é:
-            // no.transform.SetParent(parentObject); 
+            // TrashItem ì»´í¬ë„ŒíŠ¸ ìë™ ì¶”ê°€ (í”„ë¦¬íŒ¹ì— ì—†ë‹¤ë©´)
+            if (autoAddTrashComponent && spawnedObject.GetComponent<TrashItem>() == null)
+            {
+                spawnedObject.AddComponent<TrashItem>();
+            }
 
-            return no != null;
+            // SpawnManagerì— ìƒì„± ì•Œë¦¼ â­
+            if (SpawnManager.Instance != null)
+            {
+                SpawnManager.Instance.IncrementSpawnCount();
+            }
+            else
+            {
+                Debug.LogWarning("[Spawner] SpawnManager.Instanceê°€ nullì…ë‹ˆë‹¤!");
+            }
+
+            return true;
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[Spawner] Runner.Spawn ½ÇÆĞ: {e}");
+            Debug.LogError($"[Spawner] ìƒì„± ì‹¤íŒ¨: {e.Message}", this);
             return false;
         }
     }
+
+    Vector3 GetRandomPointInsideCollider(Collider col)
+    {
+        Bounds bounds = col.bounds;
+
+        float minX = bounds.min.x + edgeMargin;
+        float maxX = bounds.max.x - edgeMargin;
+        float minZ = bounds.min.z + edgeMargin;
+        float maxZ = bounds.max.z - edgeMargin;
+
+        // ë²”ìœ„ ì²´í¬
+        if (minX >= maxX)
+        {
+            minX = maxX = bounds.center.x;
+        }
+        if (minZ >= maxZ)
+        {
+            minZ = maxZ = bounds.center.z;
+        }
+
+        float randomX = Random.Range(minX, maxX);
+        float randomZ = Random.Range(minZ, maxZ);
+
+        return new Vector3(randomX, yFixedValue, randomZ);
+    }
+
+    /// <summary>
+    /// ëŸ°íƒ€ì„ ì¶”ê°€ ìƒì„±
+    /// </summary>
+    public void SpawnAdditionalObjects(int count)
+    {
+        Debug.Log($"[Spawner] ì¶”ê°€ ìƒì„±: {count}ê°œ", this);
+        SpawnObjectsOnStart(count);
+    }
+
+#if UNITY_EDITOR
+    void OnDrawGizmosSelected()
+    {
+        if (!parentObject)
+            return;
+
+        Collider[] colliders = parentObject.GetComponentsInChildren<Collider>();
+
+        foreach (Collider col in colliders)
+        {
+            if (!col.gameObject.activeSelf || !col.enabled)
+                continue;
+
+            Bounds bounds = col.bounds;
+
+            // ì½œë¼ì´ë” ì „ì²´ (íŒŒë€ìƒ‰)
+            Gizmos.color = new Color(0, 1, 1, 0.3f);
+            Gizmos.DrawWireCube(bounds.center, bounds.size);
+
+            // ìŠ¤í° ê°€ëŠ¥ ì˜ì—­ (ì´ˆë¡ìƒ‰)
+            Vector3 safeSize = bounds.size - Vector3.one * (edgeMargin * 2);
+            Gizmos.color = new Color(0, 1, 0, 0.5f);
+            Gizmos.DrawWireCube(bounds.center, safeSize);
+        }
+    }
+#endif
 }
 
-//using System.Collections.Generic;
-//using UnityEngine;
-
-
-//public class RandomObjectSpawner : MonoBehaviour
-//{
-//    [Header("½ºÆù ¸®¼Ò½º")]
-//    public GameObject[] myObjects;           // »ı¼ºÇÒ ÇÁ¸®ÆÕµé
-//    public Transform parentObject;           // ºÎ¸ğ(Plane µî)
-
-//    [Header("½ºÆù ¼³Á¤")]
-//    [SerializeField] public float yFixedValue = -9.5f; // y °íÁ¤
-//    [SerializeField] private int spawnCount = 5;       // »ı¼º °³¼ö
-
-//    private readonly List<Vector3> spawnPositions = new List<Vector3>();
-
-//    void Start()
-//    {
-//        if (!parentObject)
-//        {
-//            Debug.LogError("[Spawner] parentObject°¡ ºñ¾îÀÖ½À´Ï´Ù.");
-//            return;
-//        }
-
-//        // ÀÚ½Ä Æ÷ÀÎÆ® ¼öÁı
-//        spawnPositions.Clear();
-//        foreach (Transform child in parentObject)
-//        {
-//            spawnPositions.Add(child.position);
-//        }
-
-//        if (spawnPositions.Count == 0)
-//        {
-//            Debug.LogError("[Spawner] spawnPositions ºñ¾îÀÖÀ½. parentObjectÀÇ ÀÚ½ÄµéÀ» È®ÀÎÇÏ¼¼¿ä.");
-//            return;
-//        }
-
-//        Debug.Log($"[Spawner] Æ÷ÀÎÆ® {spawnPositions.Count}°³, ÇÁ¸®ÆÕ {myObjects.Length}°³, ¿äÃ» »ı¼º {spawnCount}°³");
-
-//        SpawnObjectsOnStart(spawnCount);
-//    }
-
-//    void SpawnObjectsOnStart(int count)
-//    {
-//        int created = 0;
-
-//        for (int i = 0; i < count; i++)
-//        {
-//            bool ok = SpawnRandomObject();
-//            if (ok) created++;
-//            else
-//            {
-//                // ½ÇÆĞ ¿øÀÎÀ» »¡¸® Ã£±â À§ÇÑ ·Î±×
-//                Debug.LogWarning($"[Spawner] #{i} ½ºÆù ½ÇÆĞ. (ÇÁ¸®ÆÕ/Æ÷ÀÎÆ®/¸Å´ÏÀú µî È®ÀÎ)");
-//            }
-//        }
-
-//        Debug.Log($"[Spawner] »ı¼º ¿Ï·á: {created}/{count}");
-//    }
-
-//    bool SpawnRandomObject()
-//    {
-//        if (spawnPositions.Count == 0 || myObjects == null || myObjects.Length == 0)
-//        {
-//            Debug.LogError("[Spawner] ½ºÆùÇÒ ¿ÀºêÁ§Æ® ¶Ç´Â À§Ä¡°¡ ¾ø½À´Ï´Ù.");
-//            return false;
-//        }
-
-//        int prefabIndex = Random.Range(0, myObjects.Length);
-//        int posIndex = Random.Range(0, spawnPositions.Count);
-
-//        Vector3 basePos = spawnPositions[posIndex];
-//        Vector3 spawnPos = new Vector3(basePos.x, yFixedValue, basePos.z);
-
-//        GameObject prefab = myObjects[prefabIndex];
-//        if (!prefab)
-//        {
-//            Debug.LogError("[Spawner] ÇÁ¸®ÆÕ ¹è¿­¿¡ nullÀÌ ÀÖ½À´Ï´Ù.");
-//            return false;
-//        }
-
-//        GameObject go = null;
-//        try
-//        {
-//            // ¡Ú y°íÁ¤ Àû¿ë + ºÎ¸ğ ¿¬°á
-//            go = Instantiate(prefab, spawnPos, Quaternion.identity, parentObject);
-
-//            // ¼±ÅÃ: ÀÌ¸§¿¡ ÀÎµ¦½º Ç¥±âÇØ¼­ Hierarchy¿¡¼­ È®ÀÎÇÏ±â ½±°Ô
-//            go.name = $"{prefab.name}_Spawned_{posIndex}";
-//        }
-//        catch (System.SystemException e)
-//        {
-//            Debug.LogError($"[Spawner] Instantiate ¿¹¿Ü: {e}");
-//            return false;
-//        }
-
-//        // ¼±ÅÃ: SpawnManager ¿¬µ¿ÀÌ ¹®Á¦ ¿øÀÎÀÎÁö ºĞ¸® È®ÀÎ
-//        try
-//        {
-//            if (SpawnManager.Instance != null)
-//                SpawnManager.Instance.IncrementSpawnCount();
-//        }
-//        catch (System.Exception e)
-//        {
-//            Debug.LogError($"[Spawner] SpawnManager È£Ãâ Áß ¿¹¿Ü: {e}");
-//            // ¸Å´ÏÀú ¹®Á¦¶ó¸é ¿©±â¼­ ¸·Èú ¼ö ÀÖÀ¸´Ï, ÀÓ½Ã ÁÖ¼® ÈÄ Å×½ºÆ®ÇØºÁ
-//        }
-
-//        return go != null;
-//    }
-//}

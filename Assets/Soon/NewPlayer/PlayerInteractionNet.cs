@@ -157,6 +157,15 @@ public class PlayerInteractionNet : NetworkBehaviour
 		// 비주얼 표시를 위한 상호작용 지점 좌표/회전 백업
 		Vector3 interactedPos = interactable.transform.position;
 		Quaternion interactedRot = interactable.transform.rotation;
+
+        // add - yerin
+        /*TrashItem trashItem = obj.GetComponent<TrashItem>();
+        if (trashItem != null)
+        {
+            trashItem.OnPickedUp();
+        }*/
+
+
         interactable.Interact();
 
         // 상호작용 성공 시 일정 확률로 게임코어 획득 처리 (서버에서 판정)

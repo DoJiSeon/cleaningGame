@@ -154,10 +154,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   myObjects:
-  - {fileID: 6398923005031798376, guid: ad7c8ff0c72c3c648b1727b3865ad764, type: 3}
+  - {fileID: 4474382198320302150, guid: 9cd1746789b311d4c9e0add4969236f1, type: 3}
   parentObject: {fileID: 206408799}
   yFixedValue: -4.8
   spawnCount: 50
+  edgeMargin: 0.3
+  autoAddTrashComponent: 1
 --- !u!4 &5361642
 Transform:
   m_ObjectHideFlags: 0
@@ -16068,6 +16070,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnPercentText: {fileID: 869586142}
+  cleanGaugeBar: {fileID: 0}
+  showDebugInfo: 1
 --- !u!4 &243020769
 Transform:
   m_ObjectHideFlags: 0
@@ -58796,10 +58800,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   myObjects:
-  - {fileID: 6398923005031798376, guid: ad7c8ff0c72c3c648b1727b3865ad764, type: 3}
+  - {fileID: 4474382198320302150, guid: 9cd1746789b311d4c9e0add4969236f1, type: 3}
   parentObject: {fileID: 191403658}
   yFixedValue: -9.5
   spawnCount: 50
+  edgeMargin: 0.3
+  autoAddTrashComponent: 1
 --- !u!4 &861786262
 Transform:
   m_ObjectHideFlags: 0
@@ -78623,10 +78629,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   myObjects:
-  - {fileID: 6398923005031798376, guid: ad7c8ff0c72c3c648b1727b3865ad764, type: 3}
+  - {fileID: 4474382198320302150, guid: 9cd1746789b311d4c9e0add4969236f1, type: 3}
   parentObject: {fileID: 1244082811}
   yFixedValue: 0
-  spawnCount: 200
+  spawnCount: 50
+  edgeMargin: 0.3
+  autoAddTrashComponent: 1
 --- !u!4 &1201417324
 Transform:
   m_ObjectHideFlags: 0
@@ -80229,7 +80237,7 @@ Transform:
   m_GameObject: {fileID: 1230108153}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 44.636204, y: 0.780739, z: -8.274047}
+  m_LocalPosition: {x: 44.636204, y: 0.780739, z: -8.806}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -139267,10 +139275,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   myObjects:
-  - {fileID: 6398923005031798376, guid: ad7c8ff0c72c3c648b1727b3865ad764, type: 3}
+  - {fileID: 4474382198320302150, guid: 9cd1746789b311d4c9e0add4969236f1, type: 3}
   parentObject: {fileID: 1989887847}
   yFixedValue: -4.9
   spawnCount: 50
+  edgeMargin: 0.3
+  autoAddTrashComponent: 1
 --- !u!4 &2139802449
 Transform:
   m_ObjectHideFlags: 0
