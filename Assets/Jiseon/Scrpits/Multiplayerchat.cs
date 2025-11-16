@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Linq;
+using UnityEngine.EventSystems;
 
 public class Multiplayerchat : NetworkBehaviour
 {
@@ -17,20 +18,24 @@ public class Multiplayerchat : NetworkBehaviour
     public GameObject chatTextPrefab;
     public TMP_Dropdown playerDropdown;
 
+    [Header("Chat Panel")]
+    public GameObject chatPanel;
+
     private Dictionary<string, List<string>> chatLogs = new Dictionary<string, List<string>>();
+    private readonly List<GameObject> _renderedMessages = new();
     private string currentChannel = "ALL";
 
     void Awake()
     {
-        // ¿£ÅÍ(Submit)·Î ¹Ù·Î Àü¼Û
+        // ï¿½ï¿½ï¿½ï¿½(Submit)ï¿½ï¿½ ï¿½Ù·ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (input != null)
         {
-            // ¾ÈÀü»§: ¶óÀÎ Å¸ÀÔÀ» Àü¼Û¿¡ ¸Â°Ô °­Á¦ (¿øÇÏ¸é ÁÖ¼®Ã³¸®)
-            // SingleLine ¶Ç´Â MultiLineSubmit ±ÇÀå
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Û¿ï¿½ ï¿½Â°ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½Ö¼ï¿½Ã³ï¿½ï¿½)
+            // SingleLine ï¿½Ç´ï¿½ MultiLineSubmit ï¿½ï¿½ï¿½ï¿½
             input.lineType = TMP_InputField.LineType.SingleLine;
 
             input.onSubmit.AddListener(_ => SubmitFromInput());
-            // ÀÏºÎ ÇÃ·§Æû/¼³Á¤¿¡¼­ onSubmitÀÌ ¾È ¿Ã ¼öµµ ÀÖÀ¸´Ï onEndEditµµ ¹é¾÷À¸·Î µî·Ï °¡´É
+            // ï¿½Ïºï¿½ ï¿½Ã·ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ onSubmitï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ onEndEditï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             // input.onEndEdit.AddListener(_ => SubmitFromInput());
         }
     }
@@ -44,30 +49,30 @@ public class Multiplayerchat : NetworkBehaviour
         }
     }
 
-    // ÀÎÇ²ÇÊµå¿¡¼­ ¿£ÅÍ·Î È£ÃâµÇ´Â ½Ç Àü¼Û ÇÔ¼ö
+    // ï¿½ï¿½Ç²ï¿½Êµå¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½Í·ï¿½ È£ï¿½ï¿½Ç´ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
     private void SubmitFromInput()
     {
-        // Æ÷Ä¿½º + ºó ¹®ÀÚ¿­ Ã¼Å©
+        // ï¿½ï¿½Ä¿ï¿½ï¿½ + ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ Ã¼Å©
         if (!input.isFocused) return;
         if (string.IsNullOrWhiteSpace(input.text)) return;
 
         CallMessagePRC();
 
-        // Àü¼Û ÈÄ¿¡µµ ÀÔ·Â °è¼Ó Ä¡°Ô Æ÷Ä¿½º À¯Áö
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Ä¿ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½ ï¿½ï¿½ï¿½ Ä¡ï¿½ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         input.ActivateInputField();
         input.MoveTextEnd(false);
     }
 
     void Update()
     {
-        // º¸Á¶: ¿£ÅÍ/³Ñ¹öÆĞµå ¿£ÅÍ Á÷Á¢ °¨Áö (IME È¯°æ µî onSubmit ´©¶ô ´ëºñ)
+        // ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½/ï¿½Ñ¹ï¿½ï¿½Ğµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (IME È¯ï¿½ï¿½ ï¿½ï¿½ onSubmit ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
         if (input.isFocused && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
         {
             SubmitFromInput();
             return;
         }
 
-        // ÀÎÇ² Æ÷Ä¿½º Áß¿£ ´Ù¸¥ Å° ·ÎÁ÷ ¸·±â
+        // ï¿½ï¿½Ç² ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ß¿ï¿½ ï¿½Ù¸ï¿½ Å° ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (input.isFocused)
             return;
 
@@ -75,6 +80,40 @@ public class Multiplayerchat : NetworkBehaviour
         {
             ShowAllPlayerNames();
         }
+
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            if (chatPanel != null)
+            {
+                bool isActive = !chatPanel.activeSelf;
+                chatPanel.SetActive(isActive);
+
+                if (isActive)
+                {
+                    Cursor.visible = true;
+                    Cursor.lockState = CursorLockMode.None;
+
+                    // ï¿½ï¿½Ç² ï¿½Êµå¿¡ ï¿½Ù½ï¿½ ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½Ö±ï¿½
+                    if (EventSystem.current != null)
+                    {
+                        EventSystem.current.SetSelectedGameObject(input.gameObject);
+                        input.ActivateInputField();
+                    }
+
+                    input.ActivateInputField();
+                }
+                else
+                {
+                    Cursor.visible = false;
+                    Cursor.lockState = CursorLockMode.Locked;
+
+                    // ï¿½ï¿½ï¿½Ãµï¿½ UI ï¿½ï¿½ï¿½ï¿½ (È¤ï¿½Ã³ï¿½ ï¿½æµ¹ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+                    EventSystem.current.SetSelectedGameObject(null);
+                }
+            }
+        }
+
+
     }
 
     void ShowAllPlayerNames()
@@ -87,7 +126,7 @@ public class Multiplayerchat : NetworkBehaviour
                 PlayerInfo info = playerObj.GetComponent<PlayerInfo>();
                 if (info != null)
                 {
-                    Debug.Log($"ÇöÀç ¹æ¿¡ ÀÖ´Â ÇÃ·¹ÀÌ¾î: {info.playerName}");
+                    Debug.Log($"ï¿½ï¿½ï¿½ï¿½ ï¿½æ¿¡ ï¿½Ö´ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½: {info.playerName}");
                 }
             }
         }
@@ -108,7 +147,7 @@ public class Multiplayerchat : NetworkBehaviour
 
             string name = info.playerName.ToString();
 
-            // ÀÚ±â ÀÚ½ÅÀº "memo"·Î Ç¥½Ã
+            // ï¿½Ú±ï¿½ ï¿½Ú½ï¿½ï¿½ï¿½ "memo"ï¿½ï¿½ Ç¥ï¿½ï¿½
             if (playerRef == Runner.LocalPlayer)
             {
                 name = "memo";
@@ -185,18 +224,13 @@ public class Multiplayerchat : NetworkBehaviour
 
     void DisplayChatLogForChannel(string channel)
     {
-        foreach (Transform child in chatContentParent)
-        {
-            Destroy(child.gameObject);
-        }
+        ClearRenderedMessages();
 
         if (chatLogs.TryGetValue(channel, out var messages))
         {
             foreach (var msg in messages)
             {
-                GameObject chatObj = Instantiate(chatTextPrefab, chatContentParent);
-                TMP_Text tmp = chatObj.GetComponent<TMP_Text>();
-                if (tmp != null) tmp.text = msg;
+                SpawnChatMessageUI(msg);
             }
         }
     }
@@ -248,7 +282,8 @@ public class Multiplayerchat : NetworkBehaviour
 
         if (myName == sender || myName == receiver)
         {
-            string formatted = $"<color=green>{sender} > {receiver}:</color> {message}";
+            //string formatted = $"<color=green>{sender} > {receiver}:</color> {message}";
+            string formatted = $"<color=green>{sender}:</color> {message}";
             string channelKey = (myName == sender) ? receiver : sender;
 
             AppendToChat(channelKey, formatted);
@@ -268,8 +303,31 @@ public class Multiplayerchat : NetworkBehaviour
 
     void AddMessageToUI(string message)
     {
-        GameObject chatObj = Instantiate(chatTextPrefab, chatContentParent);
-        TMP_Text tmp = chatObj.GetComponent<TMP_Text>();
+        SpawnChatMessageUI(message);
+    }
+
+    void SpawnChatMessageUI(string message)
+    {
+        if (!chatContentParent || !chatTextPrefab)
+        {
+            Debug.LogWarning("[Chat] chatContentParent ë˜ëŠ” chatTextPrefabì´ ë¹„ì–´ìˆì–´ UIë¥¼ ìƒì„±í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.");
+            return;
+        }
+
+        var chatObj = Instantiate(chatTextPrefab, chatContentParent);
+        var tmp = chatObj.GetComponent<TMP_Text>();
         if (tmp != null) tmp.text = message;
+        _renderedMessages.Add(chatObj);
+    }
+
+    void ClearRenderedMessages()
+    {
+        for (int i = _renderedMessages.Count - 1; i >= 0; i--)
+        {
+            if (_renderedMessages[i])
+                Destroy(_renderedMessages[i]);
+        }
+
+        _renderedMessages.Clear();
     }
 }

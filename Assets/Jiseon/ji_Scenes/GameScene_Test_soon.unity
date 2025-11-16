@@ -9023,6 +9023,7 @@ MonoBehaviour:
   chatContentParent: {fileID: 1707403435}
   chatTextPrefab: {fileID: 3288075740755549822, guid: 56f6b89622b814e4e8816991a5c6f7fa, type: 3}
   playerDropdown: {fileID: 1244978626}
+  chatPanel: {fileID: 308149005}
 --- !u!4 &120079491
 Transform:
   m_ObjectHideFlags: 0
