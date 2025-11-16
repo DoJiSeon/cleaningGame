@@ -13,7 +13,7 @@ public struct PlayerInputData : INetworkInput
 
     public bool NextEquipPressed; // E
     public bool PrevEquipPressed; // Q
-    public int SelectSlotIndex;  // 1~N, ¹Ì¼±ÅÃ ½Ã -1
+    public int SelectSlotIndex;  // 1~N, ï¿½Ì¼ï¿½ï¿½ï¿½ ï¿½ï¿½ -1
 }
 
 public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
@@ -24,28 +24,32 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     {
     }
 
-    // °ÔÀÓ ½ÃÀÛÀº ÀûÀıÇÑ ½ÃÁ¡¿¡ StartGame È£Ãâ ÇÊ¿ä
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ StartGame È£ï¿½ï¿½ ï¿½Ê¿ï¿½
     public void StartGame()
     {
 
     }
 
-    // ÀÔ·Â ¼öÁı ¹× Àü¼Û
+    // ï¿½Ô·ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
 
-        PlayerInputData data = new PlayerInputData()
-        {
+		PlayerInputData data = new PlayerInputData()
+		{
 
-            move = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical")),
-            look = new Vector3(Input.GetAxis("Mouse X"), 0f, Input.GetAxis("Mouse Y")),
-            jump = Input.GetButton("Jump"),
-            run = Input.GetKey(KeyCode.LeftShift)
-        };
-        input.Set(data);
+			move = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical")),
+			look = new Vector3(Input.GetAxis("Mouse X"), 0f, Input.GetAxis("Mouse Y")),
+			jump = Input.GetButton("Jump"),
+			run = Input.GetKey(KeyCode.LeftShift),
+			// ì¥ë¹„ ì…ë ¥: E/Q í† ê¸€, ìˆ«ìí‚¤ ìŠ¬ë¡¯ ì„ íƒ
+			NextEquipPressed = Input.GetKeyDown(KeyCode.E),
+			PrevEquipPressed = Input.GetKeyDown(KeyCode.Q),
+
+		};
+		input.Set(data);
     }
 
-    // °¢Á¾ Äİ¹éµé (ºñ¿öµÖµµ µÊ)
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½İ¹ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Öµï¿½ ï¿½ï¿½)
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) { }
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) { }
     public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }

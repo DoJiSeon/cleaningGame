@@ -1,5 +1,6 @@
 ﻿using Fusion;
 using UnityEngine;
+using System.Collections;
 
 public class PlayerInteractionNet : NetworkBehaviour
 {
@@ -10,6 +11,7 @@ public class PlayerInteractionNet : NetworkBehaviour
 
     private Interactable _current;
     public NewPlayerController _player;
+		private EquipManagerNet _equip;
     private Camera _cam;
     [SerializeField] private Animator _animator;
 
@@ -19,9 +21,17 @@ public class PlayerInteractionNet : NetworkBehaviour
     [SerializeField] private float trashDropHeight = 1.0f; // 살짝 위에서 떨어뜨리기
     [SerializeField] private LayerMask trashGroundMask = ~0;   // 바닥 레이어(없으면 기본 전부)
 
+    [Header("Game Core")]
+    [SerializeField, Range(0f, 1f)] private float gameCoreSpawnChance = 0.2f; // 상호작용 시 생성 확률
+    [SerializeField] private float gameCoreShowSeconds = 2.5f;                // 안내 UI 표시 시간
+	[SerializeField] private GameObject gameCoreVisualPrefab;                 // 상호작용 위치에 잠깐 표시할 비주얼(비네트워크 오브젝트 허용)
+	[SerializeField] private float gameCoreSpinSpeedY = 180f;                 // 초당 Y축 회전 속도(도/초)
+	[SerializeField] private float gameCoreHeightOffset = 0.15f;              // 쓰레기 위치에서 살짝 위로 띄우기
+
     public override void Spawned()
     {
         _player = GetComponent<NewPlayerController>();
+			_equip = GetComponent<EquipManagerNet>();
         _cam = GetComponentInChildren<Camera>(true);
         _animator = GetComponentInChildren<Animator>(true);
         if (_cam) _cam.gameObject.SetActive(HasInputAuthority);
@@ -29,23 +39,42 @@ public class PlayerInteractionNet : NetworkBehaviour
 
     void Update()
     {
+
         if (!HasInputAuthority) return;
         CheckInteractionLocal();
-
+        
         if (Input.GetKeyDown(KeyCode.R))
         {
-            if (_current != null)
+				// 상태별 입력 제한
+				var equipped = _equip ? _equip.Equipped : EquipmentId.Hand;
+
+				if (_current != null)
             {
+					// Hand 상태에서만 상호작용(줍기) 허용
+					if (equipped != EquipmentId.Hand)
+					{
+						// 선택: 간단 안내
+						if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("Hand 상태에서만 줍기가 가능합니다", 1.2f);
+						return;
+					}
+
                 if (_player != null)
                     _player.PlayPickUpCameraMove(new Vector3(0, -0.5f, 0.2f), 1.0f);
 
                 var no = _current.GetComponent<NetworkObject>();
+                if (no == null) no = _current.GetComponentInParent<NetworkObject>();
                 if (no != null) RPC_RequestInteract(no.Id);
                 else Debug.LogWarning("Interactable has no NetworkObject. Consider making it networked.");
             }
             else
             {
-                TrySpawnTrash();
+					// TrashSpawn(=TrashThrow) 상태에서만 스폰 허용
+					if (equipped != EquipmentId.TrashThrow)
+					{
+						if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("TrashSpawn 상태에서만 생성이 가능합니다", 1.2f);
+						return;
+					}
+					TrySpawnTrash();
             }
         }
 
@@ -108,6 +137,9 @@ public class PlayerInteractionNet : NetworkBehaviour
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
     private void RPC_RequestInteract(NetworkId targetId, RpcInfo info = default)
     {
+			// 서버 권한에서 최종 검증: Hand 상태만 허용
+			if (_equip != null && _equip.Equipped != EquipmentId.Hand) return;
+
         var obj = Runner.FindObject(targetId);
         if (obj == null) return;
 
@@ -122,7 +154,13 @@ public class PlayerInteractionNet : NetworkBehaviour
         float max = playerReach + 0.75f;
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
         _animator.SetTrigger("pickTrigger");
+		// 비주얼 표시를 위한 상호작용 지점 좌표/회전 백업
+		Vector3 interactedPos = interactable.transform.position;
+		Quaternion interactedRot = interactable.transform.rotation;
         interactable.Interact();
+
+        // 상호작용 성공 시 일정 확률로 게임코어 획득 처리 (서버에서 판정)
+		TryAwardGameCore_Server(interactedPos, interactedRot, info);
     }
 
     private void TrySpawnTrash()
@@ -139,6 +177,9 @@ public class PlayerInteractionNet : NetworkBehaviour
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
     private void RPC_RequestSpawnTrash(int prefabIndex, RpcInfo _ = default)
     {
+			// 서버 권한에서 최종 검증: TrashSpawn(=TrashThrow) 상태만 허용
+			if (_equip != null && _equip.Equipped != EquipmentId.TrashThrow) return;
+
         if (trashPrefabs == null || trashPrefabs.Length == 0) return;
         if (prefabIndex < 0 || prefabIndex >= trashPrefabs.Length) return;
 
@@ -160,4 +201,79 @@ public class PlayerInteractionNet : NetworkBehaviour
         _animator.SetTrigger("pickTrigger");
         Runner.Spawn(prefab, spawnPos, rot, Object.InputAuthority);
     }
+
+	// --- Game Core: 서버 판정 + 클라 연출 ---
+	private void TryAwardGameCore_Server(Vector3 worldPos, Quaternion worldRot, RpcInfo info)
+    {
+        if (!Object || !Object.HasStateAuthority) return;
+        if (UnityEngine.Random.value > gameCoreSpawnChance) return;
+
+        // 로컬 연출 요청(해당 상호작용자에게만)
+        RPC_ShowGameCoreToOwner(gameCoreShowSeconds);
+        Debug.Log("Game Core Spawned");
+
+		// 모든 클라이언트에 비주얼 표시 (잠깐 보였다가 사라짐)
+		RPC_ShowGameCoreVisualAtAll(worldPos, worldRot, gameCoreShowSeconds);
+
+        // 코어 카운트 증가 → 3개 달성 시 클리너 승리 브로드캐스트
+        if (GameRuleManager.Instance != null)
+        {
+            GameRuleManager.Instance.AddGameCore_Server();
+        }
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.InputAuthority)]
+    private void RPC_ShowGameCoreToOwner(float seconds, RpcInfo _ = default)
+    {
+        // 중앙 상태 텍스트에 잠깐 표시
+        if (GameRuleManager.Instance)
+            GameRuleManager.Instance.ShowLocalStatus("게임코어 획득!", Mathf.Max(0.5f, seconds));
+    }
+
+	// 모든 클라에 비주얼 표시: 네트워크 오브젝트 스폰 대신, 로컬 임시 오브젝트 생성/파괴
+	[Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+	private void RPC_ShowGameCoreVisualAtAll(Vector3 worldPos, Quaternion worldRot, float seconds, RpcInfo _ = default)
+	{
+		float life = Mathf.Max(0.5f, seconds);
+		Vector3 spawnPos = worldPos + Vector3.up * Mathf.Max(0f, gameCoreHeightOffset);
+
+		GameObject go = null;
+		if (gameCoreVisualPrefab != null)
+		{
+			go = Instantiate(gameCoreVisualPrefab, spawnPos, worldRot);
+		}
+		else
+		{
+			// 프리팹이 없을 경우 간이 구체로 대체
+			go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+			go.transform.SetPositionAndRotation(spawnPos, worldRot);
+			go.transform.localScale = Vector3.one * 0.3f;
+
+			// 충돌 방지: 임시 콜라이더 비활성화
+			var col = go.GetComponent<Collider>();
+			if (col) col.enabled = false;
+		}
+
+		if (go != null)
+		{
+			// 수명 동안 Y축 회전 후 파괴
+			StartCoroutine(SpinAndDestroy(go, life, gameCoreSpinSpeedY));
+		}
+	}
+
+	private IEnumerator SpinAndDestroy(GameObject target, float lifeSeconds, float spinSpeedDegPerSec)
+	{
+		float t = 0f;
+		while (t < lifeSeconds && target != null)
+		{
+			// 월드 좌표계 기준 Y축 회전
+			target.transform.Rotate(0f, spinSpeedDegPerSec * Time.deltaTime, 0f, Space.World);
+			t += Time.deltaTime;
+			yield return null;
+		}
+		if (target != null)
+		{
+			Destroy(target);
+		}
+	}
 }
