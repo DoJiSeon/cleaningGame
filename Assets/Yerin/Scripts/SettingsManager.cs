@@ -169,17 +169,26 @@ public class SettingsManager : MonoBehaviour
         resolutionDropdown.ClearOptions();
 
         List<string> resolutionOptions = new List<string>();
+        HashSet<string> uniqueResolutions = new HashSet<string>(); // 중복 제거용
         int currentResolutionIndex = 0;
+        int uniqueIndex = 0;
 
         for (int i = 0; i < resolutions.Length; i++)
         {
+            // 주사율 무시하고 해상도만으로 중복 체크
             string option = resolutions[i].width + " x " + resolutions[i].height;
-            resolutionOptions.Add(option);
 
-            if (resolutions[i].width == Screen.currentResolution.width &&
-                resolutions[i].height == Screen.currentResolution.height)
+            if (!uniqueResolutions.Contains(option))
             {
-                currentResolutionIndex = i;
+                uniqueResolutions.Add(option);
+                resolutionOptions.Add(option);
+
+                if (resolutions[i].width == Screen.currentResolution.width &&
+                    resolutions[i].height == Screen.currentResolution.height)
+                {
+                    currentResolutionIndex = uniqueIndex;
+                }
+                uniqueIndex++;
             }
         }
 
@@ -206,8 +215,10 @@ public class SettingsManager : MonoBehaviour
 
     void OnResolutionChanged(int index)
     {
+        if (index < 0 || index >= resolutions.Length) return;
+
         Resolution resolution = resolutions[index];
-        Screen.SetResolution(resolution.width, resolution.height, Screen.fullScreen);
+        Screen.SetResolution(resolution.width, resolution.height, Screen.fullScreenMode);
         PlayerPrefs.SetInt("ResolutionIndex", index);
     }
 
