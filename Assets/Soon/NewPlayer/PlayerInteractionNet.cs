@@ -159,11 +159,11 @@ public class PlayerInteractionNet : NetworkBehaviour
 		Quaternion interactedRot = interactable.transform.rotation;
 
         // add - yerin
-        /*TrashItem trashItem = obj.GetComponent<TrashItem>();
+        TrashItem trashItem = obj.GetComponent<TrashItem>();
         if (trashItem != null)
         {
             trashItem.OnPickedUp();
-        }*/
+        }
 
 
         interactable.Interact();
