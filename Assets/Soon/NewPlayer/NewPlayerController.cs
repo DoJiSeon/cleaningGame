@@ -23,7 +23,7 @@ public class NewPlayerController : NetworkBehaviour
     public float curSpeedY;
 
     private bool isSpeedLimited = false;
-    private float slowMultiplier = 0.3f;
+    private float slowMultiplier = 0.1f;
     private float lookXLimit = 45f;
     private bool isjumping = false;
 
@@ -217,9 +217,10 @@ public class NewPlayerController : NetworkBehaviour
         //isjumping = false;
     }
 
-    public void SetSpeedLimit(bool value)
+    public void SetSpeedLimit(bool limited, float multiplier = 0.3f)
     {
-        isSpeedLimited = value;
+        isSpeedLimited = limited;
+
     }
 
     public void PlayPickUpCameraMove(Vector3 targetOffset, float duration)

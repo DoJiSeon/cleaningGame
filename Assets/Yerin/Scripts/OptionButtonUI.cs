@@ -1,20 +1,18 @@
-
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
-using Fusion;  
+using Fusion;
 using Fusion.Sockets;
-using System; 
+using System;
 using TMPro;
-
 
 /// <summary>
 /// 두 단계 플로우:
 /// 1) 타겟(플레이어) 선택 패널 먼저 표시 (K로 순환, Enter로 확정)
 /// 2) 제재(패널티) 선택 패널 슬라이드 인 (K로 순환, Enter로 확정)
-/// 확정 시 RPC 브로드캐스트 → 타겟 본인 클라만 ApplyPenaltyLocal() 실행(디버프+DebuffUI)
+/// 모든 플레이어가 선택 완료 or 타이머 종료 시 일괄 적용
 /// </summary>
 public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 {
@@ -55,7 +53,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
     [Header("패널티 기능")]
     public Image tunnelVisionMask;  // 터널 비전용 마스크 이미지(타겟 본인만 on/off)
-    private Player _localPlayerComp; // 로컬(입력권한) 캐릭터 컴포넌트 캐싱
 
     // ===================== 타겟 선택 패널(신규) =====================
     [Header("타겟 선택 안내 텍스트")]
@@ -91,8 +88,20 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     // ===================== 네트워크 동기화 =====================
     [Networked] private TickTimer NextOpenTimer { get; set; }
 
+    // 패널티 투표 결과 저장 (서버가 관리)
+    [Networked, Capacity(16)]
+    private NetworkDictionary<PlayerRef, PenaltyVote> PenaltyVotes => default;
+
+    // 패널티 투표 데이터 구조체
+    private struct PenaltyVote : INetworkStruct
+    {
+        public PlayerRef target;
+        public int penaltyIndex;
+        public NetworkBool hasVoted;
+    }
+
     // ===================== 로컬 상태 =====================
-    private enum Phase { Closed, ChoosingTarget, ChoosingPenalty }
+    private enum Phase { Closed, ChoosingTarget, ChoosingPenalty, WaitingForOthers }
     private Phase _phase = Phase.Closed;
 
     private float _localPanelTimer;         // 패널(현재 단계) 남은 시간(연출)
@@ -100,15 +109,15 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     private int _targetIndex = -1;          // 타겟 인덱스
     private int _penaltyIndex = 0;          // 제재 인덱스
 
+    [Header("대기 상태 UI")]
+    [SerializeField] private GameObject waitingPanel; // "다른 플레이어를 기다리는 중..." 표시용
+    [SerializeField] private TMP_Text waitingText;
 
     // ===================== 라이프사이클 =====================
     void Start()
     {
-        // MeetingDirector 늦게 로드될 수도 있으니 Update에서 보정도 함
         _meeting = FindObjectOfType<MeetingDirector>(true);
-
-        // 내 입력권한 캐릭터 캐싱(멀티 환경에서 안정)
-        CacheLocalPlayerComponent();
+        if (waitingPanel) waitingPanel.SetActive(false);
     }
 
     public override void Spawned()
@@ -116,13 +125,13 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         base.Spawned();
         if (Runner != null) Runner.AddCallbacks(this);
 
-        BuildTargetList();            // 논리 목록
+        BuildTargetList();
         UpdateTargetLabel();
 
         if (Object.HasStateAuthority && _wasLive)
             NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
         else
-            NextOpenTimer = TickTimer.None; // 명시적으로 비활성
+            NextOpenTimer = TickTimer.None;
     }
 
     public override void Despawned(NetworkRunner runner, bool hasState)
@@ -136,49 +145,48 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         return GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
     }
 
-    // 게임 시작 전→후 전환 감지용
     private bool _wasLive = false;
 
     public override void FixedUpdateNetwork()
     {
         bool live = IsGameLive();
 
-        // 호스트만 스케줄 관리
         if (Object.HasStateAuthority)
         {
-            // 게임이 아직 안 시작된 경우: 어떤 패널/타이머도 동작 금지
             if (!live)
             {
-                // 혹시 열려 있으면 닫아주고
                 if (_phase != Phase.Closed)
                     RpcClosePanel();
 
-                // 타이머 비활성 유지
                 NextOpenTimer = TickTimer.None;
                 _wasLive = false;
                 return;
             }
 
-            // 막 시작된 순간(전 프레임은 false, 지금 true): 타이머 스타트
             if (!_wasLive && live)
                 NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
 
-            // 평상시 스케줄
             if (NextOpenTimer.Expired(Runner))
             {
-                // 회의 중이면 딜레이 재지정
                 if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn)
                 {
                     NextOpenTimer = TickTimer.CreateFromSeconds(Runner, 1f);
                 }
                 else
                 {
-                    RpcOpenPanel(); // 모두 동시에 열기
+                    RpcOpenPanel();
                     NextOpenTimer = TickTimer.CreateFromSeconds(Runner, interval);
                 }
             }
 
             _wasLive = true;
+
+            // 타이머 종료 시 패널티 일괄 적용
+            if (_phase != Phase.Closed && _localPanelTimer <= 0f)
+            {
+                ApplyAllPenalties();
+                RpcClosePanel();
+            }
         }
     }
 
@@ -188,8 +196,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         bool live = IsGameLive();
 
-
-        // 회의 중엔 즉시 닫기
         if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn && _phase != Phase.Closed)
         {
             RpcClosePanel();
@@ -198,29 +204,18 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         if (!live)
         {
             if (_phase != Phase.Closed)
-                LocalClosePanelVisual(); // 시각적으로 닫아둠(호스트가 아니라도)
-
-            // 여기서 return 하면, 아래 패널 타이머/입력 처리 전부 안 돌아감
+                LocalClosePanelVisual();
             return;
         }
 
-        // ▼ 여기부터는 게임 시작 후에만 동작
-
-
-        // 패널 단계 타이머(연출)
-        if (_phase == Phase.ChoosingTarget || _phase == Phase.ChoosingPenalty)
+        // 패널 타이머
+        if (_phase == Phase.ChoosingTarget || _phase == Phase.ChoosingPenalty || _phase == Phase.WaitingForOthers)
         {
             _localPanelTimer -= Time.deltaTime;
             if (timerBar) timerBar.fillAmount = Mathf.Clamp01(_localPanelTimer / timeLimit);
-
-            if (_localPanelTimer <= 0f && Object.HasStateAuthority)
-            {
-                RpcClosePanel();
-            }
         }
 
-
-        // == K/Enter 바인딩 ==
+        // K/Enter 바인딩
         if (_phase == Phase.ChoosingTarget)
         {
             if (Input.GetKeyDown(KeyCode.K))
@@ -244,11 +239,12 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
                 if (_targetIndex >= 0 && _targetIndex < _targets.Count)
                 {
                     var target = _targets[_targetIndex];
-                    // RPC 호출 (네트워크로 전송)
-                    RpcApplyPenaltyToTarget(target, _penaltyIndex);
-                }
+                    // 서버에 투표 제출
+                    RPC_SubmitPenaltyVote(target, _penaltyIndex);
 
-                if (Object && Object.HasStateAuthority) RpcClosePanel();
+                    // 대기 상태로 전환
+                    EnterWaitingPhase();
+                }
             }
         }
     }
@@ -257,30 +253,32 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcOpenPanel()
     {
+        if (!IsGameLive()) return;
 
-        if (!IsGameLive())
-            return;
+        // 서버: 투표 딕셔너리 초기화
+        if (Object.HasStateAuthority)
+        {
+            PenaltyVotes.Clear();
+        }
 
-
-        // 상태 초기화
         _phase = Phase.ChoosingTarget;
         _localPanelTimer = timeLimit;
 
-        BuildTargetList();             // 논리 후보
-        _penaltyIndex = 0;             // 제재 초기화 (지금은 안보이지만 미리)
-        RefreshPenaltyHighlight();     // 미리 업데이트
+        BuildTargetList();
+        _penaltyIndex = 0;
+        RefreshPenaltyHighlight();
         UpdateTargetLabel();
 
-        // 1) 타겟 선택 패널 먼저 표시
         OpenTargetPanel();
 
-        // 2) 제재 패널은 화면 아래 대기
         if (slideTextGO) slideTextGO.SetActive(true);
         if (slideTarget)
         {
             slideTarget.DOKill();
             slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY);
         }
+
+        if (waitingPanel) waitingPanel.SetActive(false);
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
@@ -288,7 +286,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         _phase = Phase.Closed;
 
-        // 제재 패널 슬라이드 아웃
         if (slideTarget)
         {
             slideTarget.DOKill();
@@ -296,7 +293,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
                 .OnComplete(() =>
                 {
                     if (slideTextGO) slideTextGO.SetActive(false);
-                    // 타겟 패널도 정리
                     CloseTargetPanel();
                 });
         }
@@ -305,6 +301,8 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             if (slideTextGO) slideTextGO.SetActive(false);
             CloseTargetPanel();
         }
+
+        if (waitingPanel) waitingPanel.SetActive(false);
     }
 
     private void LocalClosePanelVisual()
@@ -317,6 +315,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
         if (slideTextGO) slideTextGO.SetActive(false);
         CloseTargetPanel();
+        if (waitingPanel) waitingPanel.SetActive(false);
     }
 
     private void EnterPenaltyPhase()
@@ -329,19 +328,110 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         _phase = Phase.ChoosingPenalty;
 
-        // 타겟 패널 닫고
         CloseTargetPanel();
 
-        // 제재 패널 슬라이드 인
         if (slideTarget)
         {
             slideTarget.DOKill();
             slideTarget.DOAnchorPosY(slideInY, slideDur).SetEase(Ease.OutBack);
         }
 
-        // 제재 하이라이트 보정
         _penaltyIndex = Mathf.Clamp(_penaltyIndex, 0, Mathf.Max(0, buttonImages.Count - 1));
         RefreshPenaltyHighlight();
+    }
+
+    private void EnterWaitingPhase()
+    {
+        _phase = Phase.WaitingForOthers;
+
+        // 제재 패널 숨김
+        if (slideTarget)
+        {
+            slideTarget.DOKill();
+            slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
+        }
+
+        // 대기 패널 표시
+        if (waitingPanel) waitingPanel.SetActive(true);
+        if (waitingText) waitingText.text = "다른 플레이어를 기다리는 중...";
+    }
+
+    // ===================== 패널티 투표 제출 및 처리 =====================
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_SubmitPenaltyVote(PlayerRef target, int penaltyIndex, RpcInfo info = default)
+    {
+        if (!Object.HasStateAuthority) return;
+
+        var voter = info.Source;
+
+        // 투표 저장
+        PenaltyVotes.Set(voter, new PenaltyVote
+        {
+            target = target,
+            penaltyIndex = penaltyIndex,
+            hasVoted = true
+        });
+
+        Debug.Log($"[Server] {voter} voted: target={target}, penalty={penaltyIndex}");
+
+        // 모든 플레이어가 투표했는지 확인
+        if (CheckAllPlayersVoted())
+        {
+            Debug.Log("[Server] All players voted! Applying penalties...");
+            ApplyAllPenalties();
+            RpcClosePanel();
+        }
+    }
+
+    private bool CheckAllPlayersVoted()
+    {
+        if (Runner == null) return false;
+
+        int totalPlayers = 0;
+        foreach (var p in Runner.ActivePlayers)
+        {
+            totalPlayers++;
+        }
+
+        return PenaltyVotes.Count >= totalPlayers;
+    }
+
+    private void ApplyAllPenalties()
+    {
+        if (!Object.HasStateAuthority) return;
+
+        // 각 타겟별로 받은 패널티 수집
+        Dictionary<PlayerRef, List<int>> targetPenalties = new Dictionary<PlayerRef, List<int>>();
+
+        foreach (var kvp in PenaltyVotes)
+        {
+            var vote = kvp.Value;
+            if (!vote.hasVoted) continue;
+
+            if (!targetPenalties.ContainsKey(vote.target))
+            {
+                targetPenalties[vote.target] = new List<int>();
+            }
+            targetPenalties[vote.target].Add(vote.penaltyIndex);
+        }
+
+        // 각 타겟에게 패널티 일괄 적용
+        foreach (var kvp in targetPenalties)
+        {
+            var target = kvp.Key;
+            var penalties = kvp.Value;
+
+            // 가장 많이 받은 패널티 or 첫 번째 패널티 적용
+            // (여러 패널티를 동시 적용하려면 foreach로 모두 적용 가능)
+            if (penalties.Count > 0)
+            {
+                int selectedPenalty = penalties[0]; // 또는 투표수로 결정
+                RPC_ApplyPenaltyToTarget(target, selectedPenalty);
+            }
+        }
+
+        // 투표 초기화
+        PenaltyVotes.Clear();
     }
 
     // ===================== 타겟 목록/리스트 UI =====================
@@ -394,7 +484,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
             if (rt) rt.localScale = Vector3.one;
             if (img) img.color = targetBgNormal;
-            if (label) label.text = ResolvePlayerName(pref); // 표시명
+            if (label) label.text = ResolvePlayerName(pref);
 
             var item = new TargetItem
             {
@@ -482,7 +572,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
     private void CycleTarget()
     {
-        BuildTargetList(); // 최신 반영
+        BuildTargetList();
 
         if (_targets.Count == 0)
         {
@@ -494,7 +584,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         _targetIndex = (_targetIndex + 1) % _targets.Count;
         UpdateTargetLabel();
 
-        // 리스트 UI 반응
         RefreshTargetListVisuals();
         EnsureTargetSelectedVisible();
     }
@@ -538,8 +627,8 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     }
 
     // ===================== RPC: 패널티 적용 (타겟 본인만 로컬 적용) =====================
-    [Rpc(RpcSources.All, RpcTargets.All)]
-    private void RpcApplyPenaltyToTarget(PlayerRef target, int penaltyIndex)
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_ApplyPenaltyToTarget(PlayerRef target, int penaltyIndex)
     {
         // 타겟 본인 클라이언트만 적용
         if (Runner && Runner.LocalPlayer == target)
@@ -547,24 +636,38 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             ApplyPenaltyLocal(penaltyIndex);
         }
     }
-
+    private NewPlayerController FindLocalPlayerController()
+    {
+        var allControllers = FindObjectsOfType<NewPlayerController>(true);
+        foreach (var controller in allControllers)
+        {
+            var no = controller.GetComponent<NetworkObject>();
+            if (no && no.HasInputAuthority)
+            {
+                Debug.Log($"[OptionButtonUI] Found local player controller: {controller.gameObject.name}");
+                return controller;
+            }
+        }
+        Debug.LogError("[OptionButtonUI] Local player controller NOT found!");
+        return null;
+    }
     private void ApplyPenaltyLocal(int optionIndex)
     {
         float dur = 5f;
 
-        // 로컬 플레이어 캐시가 없으면 시도
-        if (_localPlayerComp == null) CacheLocalPlayerComponent();
+        // 내 Player 컴포넌트 찾기
+        NewPlayerController localPlayer = FindLocalPlayerController(); // 이것만 바꾸면 됨
 
-        // Debuff HUD 찾기 (비활성 포함)
+        // Debuff HUD 찾기
         var ui = FindObjectOfType<DebuffUI>(true);
 
         switch (optionIndex)
         {
             case 0: // 이동속도 제한
-                if (_localPlayerComp)
+                if (localPlayer)
                 {
-                    _localPlayerComp.SetSpeedLimit(true);
-                    StartCoroutine(ReleaseSpeedLimitAfter(dur));
+                    localPlayer.SetSpeedLimit(true);
+                    StartCoroutine(ReleaseSpeedLimitAfter(localPlayer, dur));
                 }
                 if (ui) ui.Show(DebuffType.SpeedLimit, dur);
                 break;
@@ -596,11 +699,26 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
     }
 
+    // 로컬 플레이어 찾기 (입력 권한 보유한 Player)
+    private Player FindLocalPlayer()
+    {
+        var allPlayers = FindObjectsOfType<Player>(true);
+        foreach (var p in allPlayers)
+        {
+            var no = p.GetComponent<NetworkObject>();
+            if (no && no.HasInputAuthority)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
     // ===================== 코루틴 =====================
-    IEnumerator ReleaseSpeedLimitAfter(float sec)
+    IEnumerator ReleaseSpeedLimitAfter(NewPlayerController player, float sec)
     {
         yield return new WaitForSeconds(sec);
-        if (_localPlayerComp) _localPlayerComp.SetSpeedLimit(false);
+        if (player) player.SetSpeedLimit(false);
     }
 
     IEnumerator MuteSoundFor(float sec)
@@ -622,7 +740,6 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         BuildTargetList();
         UpdateTargetLabel();
 
-        // 타겟 패널이 열려있다면 즉시 UI 갱신
         if (_phase == Phase.ChoosingTarget && targetPanelRoot && targetPanelRoot.activeInHierarchy)
         {
             RebuildTargetListUI();
@@ -661,7 +778,9 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         if (slideTarget) { slideTarget.DOKill(); slideTarget.anchoredPosition = new Vector2(slideTarget.anchoredPosition.x, slideOutY); }
         if (slideTextGO) slideTextGO.SetActive(false);
         CloseTargetPanel();
-        BuildTargetList(); UpdateTargetLabel();
+        if (waitingPanel) waitingPanel.SetActive(false);
+        BuildTargetList();
+        UpdateTargetLabel();
     }
     public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
     public void OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason) { }
@@ -677,47 +796,29 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
 
     // ===================== 로컬 유틸/보강 =====================
-    private void CacheLocalPlayerComponent()
-    {
-        // 씬에 여러 Player가 있을 수 있으므로 입력권한 보유한 내 캐릭터 찾기
-        var all = FindObjectsOfType<Player>(true);
-        foreach (var p in all)
-        {
-            var no = p.GetComponent<NetworkObject>();
-            if (no && no.HasInputAuthority) { _localPlayerComp = p; break; }
-        }
-    }
-
-    // PlayerRef → 표시명 해석 (VoteUI와 동일한 전략)
     private string ResolvePlayerName(PlayerRef pref)
     {
-        // 1) 정석: PlayerObject 매핑
         if (Runner != null && Runner.TryGetPlayerObject(pref, out var obj) && obj != null)
         {
             var pi = obj.GetComponent<PlayerInfo>();
             if (pi != null)
             {
                 if (!string.IsNullOrEmpty(pi.cachedName)) return pi.cachedName;
-
                 var netName = pi.playerName.ToString();
                 if (!string.IsNullOrEmpty(netName)) return netName;
             }
         }
 
-        // 2) 폴백: 씬 탐색
         foreach (var pi in UnityEngine.Object.FindObjectsOfType<PlayerInfo>(true))
         {
             if (pi != null && pi.Object != null && pi.Object.InputAuthority == pref)
             {
                 if (!string.IsNullOrEmpty(pi.cachedName)) return pi.cachedName;
-
                 var netName = pi.playerName.ToString();
                 if (!string.IsNullOrEmpty(netName)) return netName;
             }
         }
 
-        // 3) 최후 폴백: 아이디
         return $"Player {pref.PlayerId}";
     }
 }
-
