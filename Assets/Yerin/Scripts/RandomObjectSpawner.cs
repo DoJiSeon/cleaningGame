@@ -27,6 +27,13 @@ public class RandomObjectSpawner : NetworkBehaviour
     // Start() ���� Spawned()�� �����մϴ�.
     public override void Spawned()
     {
+        // Runner.Spawn을 사용하려면 서버 권한이 필요합니다
+        if (!Object.HasStateAuthority)
+        {
+            Debug.LogWarning("[Spawner] 서버 권한이 없어 스폰을 건너뜁니다.", this);
+            return;
+        }
+
         if (!ValidateSetup())
             return;
 
@@ -61,6 +68,17 @@ public class RandomObjectSpawner : NetworkBehaviour
             {
                 Debug.LogError($"[Spawner] myObjects[{i}]가 null입니다.", this);
                 return false;
+            }
+
+            // Runner.Spawn을 사용하려면 프리팹에 NetworkObject 컴포넌트가 있어야 합니다
+            var networkObj = myObjects[i].GetComponent<NetworkObject>();
+            if (networkObj == null)
+            {
+                networkObj = myObjects[i].GetComponentInParent<NetworkObject>();
+            }
+            if (networkObj == null)
+            {
+                Debug.LogWarning($"[Spawner] myObjects[{i}] ({myObjects[i].name})에 NetworkObject 컴포넌트가 없습니다. Runner.Spawn이 실패할 수 있습니다.", this);
             }
         }
 
@@ -102,6 +120,19 @@ public class RandomObjectSpawner : NetworkBehaviour
         if (floorColliders.Count == 0)
             return false;
 
+        // Runner와 서버 권한 확인
+        if (Runner == null)
+        {
+            Debug.LogError("[Spawner] Runner가 null입니다!", this);
+            return false;
+        }
+
+        if (!Object.HasStateAuthority)
+        {
+            Debug.LogWarning("[Spawner] 서버 권한이 없어 스폰을 건너뜁니다.", this);
+            return false;
+        }
+
         // 랜덤 콜라이더 선택
         Collider randomCollider = floorColliders[Random.Range(0, floorColliders.Count)];
 
@@ -114,9 +145,20 @@ public class RandomObjectSpawner : NetworkBehaviour
 
         try
         {
-            // 오브젝트 생성
-            GameObject spawnedObject = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
+            // 네트워크 오브젝트로 스폰
+            Quaternion rotation = Quaternion.identity;
+            NetworkObject spawnedNetworkObj = Runner.Spawn(prefab, spawnPos, rotation, Object.InputAuthority);
+            
+            if (spawnedNetworkObj == null)
+            {
+                Debug.LogError($"[Spawner] Runner.Spawn 실패: {prefab.name}", this);
+                return false;
+            }
+
+            GameObject spawnedObject = spawnedNetworkObj.gameObject;
             spawnedObject.name = $"{prefab.name}_{randomCollider.gameObject.name}";
+
+            Debug.Log($"[Spawner] 네트워크 오브젝트 스폰 성공: {spawnedObject.name}, NetworkId: {spawnedNetworkObj.Id}");
 
             // TrashItem 컴포넌트 자동 추가 (프리팹에 없다면)
             if (autoAddTrashComponent && spawnedObject.GetComponent<TrashItem>() == null)
@@ -173,6 +215,13 @@ public class RandomObjectSpawner : NetworkBehaviour
     /// </summary>
     public void SpawnAdditionalObjects(int count)
     {
+        // 서버 권한 확인
+        if (!Object.HasStateAuthority)
+        {
+            Debug.LogWarning("[Spawner] 서버 권한이 없어 추가 스폰을 건너뜁니다.", this);
+            return;
+        }
+
         Debug.Log($"[Spawner] 추가 생성: {count}개", this);
         SpawnObjectsOnStart(count);
     }
