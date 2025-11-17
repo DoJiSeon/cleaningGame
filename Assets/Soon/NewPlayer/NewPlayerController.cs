@@ -46,6 +46,14 @@ public class NewPlayerController : NetworkBehaviour
     private float yaw;                 // 본체 Yaw
     private float mouseXSensitivity = 0.2f; // 마우스 X 민감도(취향대로)
 
+    private float teleportLockUntil = 0f;
+
+    public void LockMovementForTeleport(float duration)
+    {
+        teleportLockUntil = Runner.SimulationTime + duration;
+    }
+
+
     // (임시) 서버가 스폰 시 인스펙터 값 적용 중이라면 그대로 유지
     public void ServerSetRole(PlayerRole role)
     {
@@ -111,6 +119,10 @@ public class NewPlayerController : NetworkBehaviour
     public override void FixedUpdateNetwork()
     {
         if (!HasInputAuthority)
+            return;
+
+        // 텔포 직후 이동 금지
+        if (Runner.SimulationTime < teleportLockUntil)
             return;
 
         if (GetInput(out PlayerInputData inputData))

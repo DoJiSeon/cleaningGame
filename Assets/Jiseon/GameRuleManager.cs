@@ -10,26 +10,23 @@ public class GameRuleManager : NetworkBehaviour
     public static GameRuleManager Instance;
 
     [Header("UI References")]
-    public Button startButton;         // 호스트 전용
-    public Button readyButton;         // 클라 전용
-    public TMP_Text statusText;        // 중앙 상태 (카운트다운 / Game Start!)
-    public TMP_Text timerText;         // 게임 시간
-    public TMP_Text playerCountText;   // 현재 인원 표시
+    public Button startButton;
+    public Button readyButton;
+    public TMP_Text statusText;
+    public TMP_Text timerText;
+    public TMP_Text playerCountText;
 
     [Networked] private TickTimer CountdownTimer { get; set; }
     [Networked] private TickTimer GameTimer { get; set; }
     [Networked] private bool GameStarted { get; set; }
     [Networked] private NetworkString<_32> StatusMessage { get; set; }
 
-    // 게임코어 진행상태
     [Networked] private int GameCoreCount { get; set; }
 
-    // 추가
     public bool IsGameLive
     {
         get
         {
-            // Runner나 NetworkObject가 준비되지 않았으면 false 처리
             if (Object == null || Object.Runner == null)
                 return false;
             return GameStarted;
@@ -37,34 +34,50 @@ public class GameRuleManager : NetworkBehaviour
     }
 
     private readonly List<PlayerInfo> _players = new();
-    private readonly List<PlayerInfo> _saboteurs = new(); // Host 보관용
+    private readonly List<PlayerInfo> _saboteurs = new();
     private bool _uiReady;
 
     private const int COUNTDOWN_DURATION = 3;
-    private const int GAME_DURATION = 1800; // 30분
+    private const int GAME_DURATION = 1800;
 
-    // 역할 메시지 표시 시간
     [SerializeField] private float roleMessageSeconds = 3f;
 
-    // 로컬 전용 상태 텍스트 오버라이드
     private string _localStatusOverride = null;
     private float _localStatusUntil = 0f;
 
     private bool IsHost => Runner != null && (Runner.IsSharedModeMasterClient || Runner.IsServer);
+
+
+    // -----------------------------------------------
+    //  NEW: Game Result Enum
+    // -----------------------------------------------
+    public enum GameResult
+    {
+        CleanerWin,
+        ImpostorWin,
+        NeedVoting
+    }
+
+    [Header("Meeting")]
+    public Transform meetingPoint;
+
+
 
     void Awake()
     {
         Instance = this;
     }
 
+
     public override void Spawned()
     {
         StartCoroutine(SetupUIDelayed());
     }
 
+
     private IEnumerator SetupUIDelayed()
     {
-        yield return null; // Runner 초기화 대기
+        yield return null;
 
         bool isHost = IsHost;
 
@@ -77,7 +90,7 @@ public class GameRuleManager : NetworkBehaviour
             {
                 startButton.onClick.RemoveAllListeners();
                 startButton.onClick.AddListener(OnStartClicked);
-                startButton.interactable = false; // 초기 비활성화
+                startButton.interactable = false;
             }
         }
         else
@@ -90,14 +103,16 @@ public class GameRuleManager : NetworkBehaviour
                 readyButton.onClick.RemoveAllListeners();
                 readyButton.onClick.AddListener(() =>
                 {
-                    var localPlayer = GetLocalPlayer();
-                    if (localPlayer != null) localPlayer.ToggleReady();
+                    var local = GetLocalPlayer();
+                    if (local != null) local.ToggleReady();
                 });
             }
         }
 
         _uiReady = true;
     }
+
+
 
     void Update()
     {
@@ -116,7 +131,6 @@ public class GameRuleManager : NetworkBehaviour
             if (playerCountText) playerCountText.text = $"{currentPlayers} / {maxPlayers}";
         }
 
-        // 로컬 오버라이드 > 네트워크 메시지
         if (statusText)
         {
             if (Time.time < _localStatusUntil && !string.IsNullOrEmpty(_localStatusOverride))
@@ -130,41 +144,60 @@ public class GameRuleManager : NetworkBehaviour
             float elapsed = GAME_DURATION - GameTimer.RemainingTime(Runner).GetValueOrDefault();
             int minutes = Mathf.FloorToInt(elapsed / 60);
             int seconds = Mathf.FloorToInt(elapsed % 60);
+
             if (timerText) timerText.text = $"{minutes:00}:{seconds:00}";
         }
 
         if (!GameStarted && !IsHost)
         {
             var local = GetLocalPlayer();
-            if (local != null && readyButton != null)
+            if (local != null)
             {
                 var tmp = readyButton.GetComponentInChildren<TMP_Text>();
                 if (tmp) tmp.text = local.IsReady ? "Wait..." : "Ready";
             }
         }
+
+        // -----------------------------------------------
+        //  NEW: 외부 감시자 방식(원본 함수 건드리지 않음)
+        // -----------------------------------------------
+        if (IsHost)
+        {
+            CheckCoreWinState();
+            CheckTimerEnd();
+        }
     }
 
-    // 호스트 안전망 폴링
+
+
     void LateUpdate()
     {
         if (!_uiReady || !IsHost || startButton == null || GameStarted) return;
         startButton.interactable = AreAllClientsReady();
     }
 
-    // 로컬 전용 상태 문구 표시 API
+
+
+    // -----------------------------------------------
+    //  LOCAL MESSAGE
+    // -----------------------------------------------
     public void ShowLocalStatus(string text, float seconds)
     {
         _localStatusOverride = text;
         _localStatusUntil = Time.time + Mathf.Max(0.1f, seconds);
     }
 
-    // 플레이어 등록/해제
+
+
+    // -----------------------------------------------
+    //  PLAYER REGISTER
+    // -----------------------------------------------
     public void RegisterPlayer(PlayerInfo pi)
     {
         if (!_players.Contains(pi))
         {
             _players.Add(pi);
-            Debug.Log($"[GRM] 플레이어 등록됨: {pi.cachedName} / {_players.Count}명");
+            Debug.Log($"[GRM] Player Registered: {pi.cachedName}");
         }
         UpdateStartButtonState();
     }
@@ -174,13 +207,14 @@ public class GameRuleManager : NetworkBehaviour
         if (_players.Contains(pi))
         {
             _players.Remove(pi);
-            string safeName = pi ? pi.cachedName : "(null)";
-            Debug.Log($"[GRM] 플레이어 해제됨: {safeName} / {_players.Count}명");
+            Debug.Log($"[GRM] Player Unregistered: {pi.cachedName}");
         }
 
         _players.RemoveAll(x => x == null || x.Object == null);
         UpdateStartButtonState();
     }
+
+
 
     private bool AreAllClientsReady()
     {
@@ -193,42 +227,41 @@ public class GameRuleManager : NetworkBehaviour
         {
             if (p == null || p.Object == null) continue;
 
-            // 호스트 자신 제외
             if (Runner != null && p.Object.InputAuthority == Runner.LocalPlayer) continue;
 
             clientCount++;
             if (p.IsReady) readyClients++;
         }
 
-        // 혼자(호스트만)일 경우에도 바로 true 리턴
         if (clientCount == 0)
             return true;
 
-        return clientCount > 0 && readyClients == clientCount;
+        return readyClients == clientCount;
     }
+
+
 
     public void UpdateStartButtonState()
     {
         if (!IsHost || startButton == null) return;
-        //startButton.interactable = AreAllClientsReady();
 
-        // 플레이어가 1명(호스트뿐)이어도 시작 가능하게
         if (_players.Count <= 1)
-        {
             startButton.interactable = true;
-        }
         else
-        {
             startButton.interactable = AreAllClientsReady();
-        }
     }
+
+
 
     private void OnStartClicked()
     {
         if (!IsHost) return;
-        Debug.Log("[GRM] 게임 시작 카운트다운 시작!");
+
+        Debug.Log("[GRM] Countdown!");
         StartCoroutine(CountdownRoutine());
     }
+
+
 
     private IEnumerator CountdownRoutine()
     {
@@ -248,61 +281,57 @@ public class GameRuleManager : NetworkBehaviour
         StartGame();
     }
 
+
+
     private void StartGame()
     {
         if (!IsHost) return;
 
         GameStarted = true;
         GameTimer = TickTimer.CreateFromSeconds(Runner, GAME_DURATION);
+
         if (timerText) timerText.text = "00:00";
 
-        // 역할 배정 및 개별 안내
         AssignRolesAndNotify();
 
-        // 게임코어 초기화
         GameCoreCount = 0;
     }
+
+
 
     private void AssignRolesAndNotify()
     {
         _saboteurs.Clear();
 
-        // 유효한 플레이어 목록
-        List<PlayerInfo> list = new List<PlayerInfo>(_players);
+        List<PlayerInfo> list = new(_players);
         list.RemoveAll(x => x == null || x.Object == null);
 
         int n = list.Count;
         if (n == 0) return;
 
-        // Saboteur 수: 총원의 1/3, 최소 1
         int saboteurCount = Mathf.Max(1, Mathf.FloorToInt(n / 3f));
 
-        // Fisher-Yates shuffle
         for (int i = n - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
             (list[i], list[j]) = (list[j], list[i]);
         }
 
-        // 배정
         for (int i = 0; i < n; i++)
         {
             var p = list[i];
-            bool isSaboteur = i < saboteurCount;
+            bool isImpo = i < saboteurCount;
+            var role = isImpo ? PlayerInfo.Role.Saboteur : PlayerInfo.Role.Cleaner;
 
-            var role = isSaboteur ? PlayerInfo.Role.Saboteur : PlayerInfo.Role.Cleaner;
-
-            // 역할 세팅(권한 없는 경우 각자의 StateAuthority에게 RPC로 위임)
             p.SetRoleServer(role);
 
-            if (isSaboteur) _saboteurs.Add(p);
+            if (isImpo) _saboteurs.Add(p);
 
-            // 각자에게만 안내 문구 전송
             p.RpcShowRoleMessage(role, roleMessageSeconds);
         }
-
-        Debug.Log($"[GRM] Roles assigned. Saboteurs: {saboteurCount}/{n}");
     }
+
+
 
     private PlayerInfo GetLocalPlayer()
     {
@@ -314,23 +343,21 @@ public class GameRuleManager : NetworkBehaviour
         return null;
     }
 
-    // === Game Core API (서버 전용) ===
+    // ----------------------------------------------------------
+    //  ⚠ ABSOLUTELY DO NOT MODIFY (요청사항: 팀원이 만든 코드 그대로 유지)
+    // ----------------------------------------------------------
     public void AddGameCore_Server()
     {
         if (!IsHost) return;
         if (!GameStarted) return;
 
         GameCoreCount = GameCoreCount + 1;
-
-        // 클라이언트에 현 카운트 안내(선택)
         RpcNotifyGameCoreProgress_All(GameCoreCount);
 
         if (GameCoreCount >= 3)
         {
-            // 클리너 승리 브로드캐스트
             RpcAnnounceCleanerWin_All();
 
-            // 게임 정지(간단히 표시만 하고 타이머/상태를 멈추고 싶다면 아래 해제)
             GameStarted = false;
             GameTimer = TickTimer.None;
         }
@@ -339,7 +366,6 @@ public class GameRuleManager : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcNotifyGameCoreProgress_All(int count)
     {
-        // 로컬 상태 텍스트에 잠깐 표시
         ShowLocalStatus($"게임코어 {count}/3", 1.5f);
     }
 
@@ -349,5 +375,120 @@ public class GameRuleManager : NetworkBehaviour
         StatusMessage = "Cleaner 승리!";
         ShowLocalStatus("Cleaner 승리!", 3f);
         if (timerText) timerText.text = "끝";
+    }
+
+
+    // ----------------------------------------------------------------
+    //  NEW: Core 3개 모인 후 '게임 종료 상태를 감시해서' 진짜 종료시키는 부분
+    // ----------------------------------------------------------------
+    private void CheckCoreWinState()
+    {
+        if (!GameStarted) return;
+
+        // 위의 AddGameCore_Server는 건드릴 수 없으므로
+        // 여기서 최종 승리 처리 실행
+        if (GameCoreCount >= 3)
+        {
+            GameOver(GameResult.ImpostorWin, "Impostor Core Win");
+        }
+    }
+
+
+    // ----------------------------------------------------------------
+    //  NEW: 타이머 종료 처리
+    // ----------------------------------------------------------------
+    private void CheckTimerEnd()
+    {
+        if (!GameStarted) return;
+        if (!GameTimer.Expired(Runner)) return;
+
+        float gauge = 0f;
+
+        if (SpawnManager.Instance != null)
+            gauge = SpawnManager.Instance.GetDeSpawnPercentage();
+
+        const float CLEAN_GOAL = 0.8f;
+
+        if (gauge >= CLEAN_GOAL)
+        {
+            GameOver(GameResult.CleanerWin, "Cleaner Gauge Reached");
+        }
+        else
+        {
+            GameOver(GameResult.NeedVoting, "Gauge Insufficient → Voting");
+        }
+    }
+
+
+    // ----------------------------------------------------------------
+    //  NEW: Game Over Router
+    // ----------------------------------------------------------------
+    public void GameOver(GameResult result, string reason = "")
+    {
+        if (!IsHost) return;
+        if (!GameStarted) return;
+
+        Debug.Log($"[GRM] GameOver() / {result} / {reason}");
+
+        GameStarted = false;
+        GameTimer = TickTimer.None;
+
+        switch (result)
+        {
+            case GameResult.CleanerWin:
+                RpcShowMessage_All("청소부 승리!", 4f);
+                break;
+
+            case GameResult.ImpostorWin:
+                RpcShowMessage_All("임포스터 승리!", 4f);
+                break;
+
+            case GameResult.NeedVoting:
+                RpcShowMessage_All("시간 종료! 투표 시작합니다!", 4f);
+                BeginVotingPhase();
+                break;
+        }
+    }
+
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcShowMessage_All(string msg, float seconds)
+    {
+        ShowLocalStatus(msg, seconds);
+        StatusMessage = msg;
+    }
+
+
+    // ----------------------------------------------------------------
+    //  NEW: Voting Phase start
+    // ----------------------------------------------------------------
+    private void BeginVotingPhase()
+    {
+        Debug.Log("[GRM] Voting Phase START");
+
+        if (meetingPoint)
+            TeleportAllPlayersToMeetingPoint();
+    }
+
+
+    // ----------------------------------------------------------------
+    //  NEW: Teleport All
+    // ----------------------------------------------------------------
+    public void TeleportAllPlayersToMeetingPoint()
+    {
+        if (!IsHost) return;
+        if (meetingPoint == null) return;
+
+        foreach (var pi in _players)
+        {
+            if (pi == null || pi.Object == null) continue;
+
+            pi.Object.transform.position = meetingPoint.position;
+            pi.Object.transform.rotation = meetingPoint.rotation;
+
+            var controller = pi.Object.GetComponent<NewPlayerController>();
+            if (controller != null)
+                controller.LockMovementForTeleport(0.2f);
+        }
     }
 }

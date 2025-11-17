@@ -64386,6 +64386,7 @@ MonoBehaviour:
   statusText: {fileID: 1300663123}
   timerText: {fileID: 321325713}
   playerCountText: {fileID: 1254522338}
+  meetingTeleportPoint: {fileID: 1230108154}
   roleMessageSeconds: 3
 --- !u!4 &934195248
 Transform:
