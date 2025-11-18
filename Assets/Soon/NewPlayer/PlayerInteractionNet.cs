@@ -58,8 +58,12 @@ public class PlayerInteractionNet : NetworkBehaviour
 						return;
 					}
 
+                // 플레이어를 카메라 방향으로 회전 (클라이언트에서 처리)
                 if (_player != null)
+                {
+                    _player.RotateToCameraDirection();
                     _player.PlayPickUpCameraMove(new Vector3(0, -0.5f, 0.2f), 1.0f);
+                }
 
                 var no = _current.GetComponent<NetworkObject>();
                 if (no == null) no = _current.GetComponentInParent<NetworkObject>();
@@ -153,6 +157,11 @@ public class PlayerInteractionNet : NetworkBehaviour
         // 거리 검증
         float max = playerReach + 0.75f;
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
+        
+        // Pickup 애니메이션 중 이동 금지 (회전은 클라이언트에서 이미 처리됨)
+        if (_player != null)
+            _player.LockMovementForPickup(1.5f);
+        
         _animator.SetTrigger("pickTrigger");
 		// 비주얼 표시를 위한 상호작용 지점 좌표/회전 백업
 		Vector3 interactedPos = interactable.transform.position;
@@ -175,16 +184,25 @@ public class PlayerInteractionNet : NetworkBehaviour
     private void TrySpawnTrash()
     {
         if (trashPrefabs == null || trashPrefabs.Length == 0) return;
+        if (_cam == null) return;
+
+        // 플레이어를 카메라 방향으로 회전 (클라이언트에서 처리)
+        if (_player != null)
+            _player.RotateToCameraDirection();
 
         // 어떤 쓰레기를 뽑을지 클라에서 랜덤 선택
         int pick = Random.Range(0, trashPrefabs.Length);
 
-        // 서버에 스폰 요청 (좌표계산은 서버에서 안전하게)
-        RPC_RequestSpawnTrash(pick);
+        // 카메라 위치와 방향을 서버에 전달
+        Vector3 camPos = _cam.transform.position;
+        Vector3 camForward = _cam.transform.forward;
+
+        // 서버에 스폰 요청 (카메라 기준 좌표 계산)
+        RPC_RequestSpawnTrash(pick, camPos, camForward);
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
-    private void RPC_RequestSpawnTrash(int prefabIndex, RpcInfo _ = default)
+    private void RPC_RequestSpawnTrash(int prefabIndex, Vector3 cameraPosition, Vector3 cameraForward, RpcInfo _ = default)
     {
 			// 서버 권한에서 최종 검증: TrashSpawn(=TrashThrow) 상태만 허용
 			if (_equip != null && _equip.Equipped != EquipmentId.TrashThrow) return;
@@ -195,9 +213,13 @@ public class PlayerInteractionNet : NetworkBehaviour
         var prefab = trashPrefabs[prefabIndex];
         if (prefab == null) return;
 
-        // 플레이어 기준으로 앞/위 오프셋 잡고 바닥을 향해 레이캐스트
-        Vector3 origin = transform.position
-                       + transform.forward * trashForwardOffset
+        // 카메라 기준으로 앞/위 오프셋 잡고 바닥을 향해 레이캐스트
+        Vector3 camForwardFlat = cameraForward;
+        camForwardFlat.y = 0f;
+        camForwardFlat.Normalize();
+
+        Vector3 origin = cameraPosition
+                       + camForwardFlat * trashForwardOffset
                        + Vector3.up * trashDropHeight;
 
         Vector3 spawnPos = origin;
@@ -206,6 +228,10 @@ public class PlayerInteractionNet : NetworkBehaviour
 
         float yaw = UnityEngine.Random.Range(0f, 360f);
         Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+
+        // Pickup 애니메이션 중 이동 금지 (회전은 클라이언트에서 이미 처리됨)
+        if (_player != null)
+            _player.LockMovementForPickup(1.5f);
 
         _animator.SetTrigger("pickTrigger");
         Runner.Spawn(prefab, spawnPos, rot, Object.InputAuthority);

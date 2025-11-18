@@ -47,10 +47,26 @@ public class NewPlayerController : NetworkBehaviour
     private float mouseXSensitivity = 0.2f; // 마우스 X 민감도(취향대로)
 
     private float teleportLockUntil = 0f;
+    private float pickupLockUntil = 0f;
 
     public void LockMovementForTeleport(float duration)
     {
         teleportLockUntil = Runner.SimulationTime + duration;
+    }
+
+    public void LockMovementForPickup(float duration)
+    {
+        pickupLockUntil = Runner.SimulationTime + duration;
+    }
+
+    // 카메라 방향으로 플레이어 회전
+    public void RotateToCameraDirection()
+    {
+        if (playerCamera == null) return;
+        
+        float targetY = playerCamera.transform.eulerAngles.y;
+        transform.rotation = Quaternion.Euler(0f, targetY, 0f);
+        yaw = targetY;
     }
 
 
@@ -123,6 +139,10 @@ public class NewPlayerController : NetworkBehaviour
 
         // 텔포 직후 이동 금지
         if (Runner.SimulationTime < teleportLockUntil)
+            return;
+
+        // Pickup 애니메이션 중 이동 금지
+        if (Runner.SimulationTime < pickupLockUntil)
             return;
 
         if (GetInput(out PlayerInputData inputData))
