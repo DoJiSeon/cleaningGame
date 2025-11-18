@@ -16,6 +16,13 @@ public class GameRuleManager : NetworkBehaviour
     public TMP_Text timerText;         // 게임 시간
     public TMP_Text playerCountText;   // 현재 인원 표시
 
+    [Header("Clean Gauge UI")]
+    [SerializeField] private TMP_Text cleanGaugeText;
+    // 제재 패널 열림 여부 (OptionButtonUI에서 알려줌)
+    [HideInInspector] public bool isPenaltyPanelOpen = false;
+    // 이전에 알려준 10단위 청소율 기록
+    private int lastNotifiedPercent10 = 0;
+
     [Networked] private TickTimer CountdownTimer { get; set; }
     [Networked] private TickTimer GameTimer { get; set; }
     [Networked] private bool GameStarted { get; set; }
@@ -51,6 +58,13 @@ public class GameRuleManager : NetworkBehaviour
     private float _localStatusUntil = 0f;
 
     private bool IsHost => Runner != null && (Runner.IsSharedModeMasterClient || Runner.IsServer);
+
+    // ======== END REASON ENUM ========
+    public enum EndReason
+    {
+        TimeUp,
+        GameCoreWin
+    }
 
     void Awake()
     {
@@ -116,6 +130,36 @@ public class GameRuleManager : NetworkBehaviour
             if (playerCountText) playerCountText.text = $"{currentPlayers} / {maxPlayers}";
         }
 
+        // === ★ 청소 게이지 표시 + 10% 단위 알림 ===
+        if (SpawnManager.Instance != null)
+        {
+            float percent = SpawnManager.Instance.GetCleanPercentage();
+
+            // 1) 평소에는 "??%"
+            //    제재 패널 열렸을 때만 실제 퍼센트 공개
+            if (cleanGaugeText != null)
+            {
+                if (isPenaltyPanelOpen)
+                {
+                    cleanGaugeText.text = $"청소 게이지: {percent:0}%";
+                }
+                else
+                {
+                    cleanGaugeText.text = "청소 게이지: ??%";
+                }
+            }
+
+            // 2) 10% 단위마다 ShowLocalStatus 호출
+            int percent10 = Mathf.FloorToInt(percent / 10f) * 10;
+            if (percent10 >= 10 && percent10 <= 100 && percent10 != lastNotifiedPercent10)
+            {
+                ShowLocalStatus($"청소 게이지 {percent10}% 달성!", 1.5f);
+                lastNotifiedPercent10 = percent10;
+            }
+        }
+
+
+
         if (statusText)
         {
             if (Time.time < _localStatusUntil && !string.IsNullOrEmpty(_localStatusOverride))
@@ -124,12 +168,10 @@ public class GameRuleManager : NetworkBehaviour
                 statusText.text = StatusMessage.ToString();
         }
 
-        if (GameStarted && GameTimer.IsRunning)
+        // === ★ 시간 종료 체크 ===
+        if (GameStarted && GameTimer.IsRunning && GameTimer.Expired(Runner))
         {
-            float elapsed = GAME_DURATION - GameTimer.RemainingTime(Runner).GetValueOrDefault();
-            int minutes = Mathf.FloorToInt(elapsed / 60);
-            int seconds = Mathf.FloorToInt(elapsed % 60);
-            if (timerText) timerText.text = $"{minutes:00}:{seconds:00}";
+            EndGame(EndReason.TimeUp);
         }
 
         if (!GameStarted && !IsHost)
@@ -238,9 +280,8 @@ public class GameRuleManager : NetworkBehaviour
 
         StatusMessage = "";
 
-        // ★ 카운트다운 직후 텔포트 시작!!
+        // ★ 텔포트
         TeleportAllPlayersToMeetingPoint();
-
         StartGame();
     }
 
@@ -302,7 +343,8 @@ public class GameRuleManager : NetworkBehaviour
         return null;
     }
 
-    // =============== ★ 텔포트 기능 구현 ===============
+
+    // =============== ★ 텔포트 기능 ===============
 
     public void TeleportAllPlayersToMeetingPoint()
     {
@@ -324,7 +366,8 @@ public class GameRuleManager : NetworkBehaviour
         Debug.Log("[GRM] 모든 플레이어 텔포트 완료!");
     }
 
-    // =============== Game Core 관련 ===============
+
+    // =============== ★ Game Core 관련 ===============
 
     public void AddGameCore_Server()
     {
@@ -336,10 +379,8 @@ public class GameRuleManager : NetworkBehaviour
 
         if (GameCoreCount >= 3)
         {
-            RpcAnnounceCleanerWin_All();
-
-            GameStarted = false;
-            GameTimer = TickTimer.None;
+            // ★ 게임코어 3개 → 게임 종료
+            EndGame(EndReason.GameCoreWin);
         }
     }
 
@@ -349,6 +390,57 @@ public class GameRuleManager : NetworkBehaviour
         ShowLocalStatus($"게임코어 {count}/3", 1.5f);
     }
 
+
+    // =============== ★ EndGame 시스템 ===============
+
+    public void EndGame(EndReason reason)
+    {
+        if (!IsHost) return;
+
+        GameStarted = false;
+        GameTimer = TickTimer.None;
+
+        switch (reason)
+        {
+            case EndReason.GameCoreWin:
+                AnnounceCleanerWin("게임코어 3개 달성");
+                break;
+
+            case EndReason.TimeUp:
+                HandleEndByTimeUp();
+                break;
+        }
+    }
+
+    private void AnnounceCleanerWin(string detail)
+    {
+        StatusMessage = "Cleaner 승리!";
+        ShowLocalStatus($"Cleaner 승리!\n({detail})", 4f);
+        if (timerText) timerText.text = "끝";
+
+        Debug.Log($"[GRM] Cleaner 승리: {detail}");
+    }
+
+    private void HandleEndByTimeUp()
+    {
+        float percent = SpawnManager.Instance.GetCleanPercentage();
+        float goal = 70f;  // 원하는 목표치 (필요하면 public 변수로 빼도 됨)
+
+        if (percent >= goal)
+        {
+            AnnounceCleanerWin($"시간 종료 + 청소율 {percent:0}% 달성");
+        }
+        else
+        {
+            //투표를 시작합니다잉
+            ShowLocalStatus($"회의를 시작한다.", 1.5f);
+
+        }
+    }
+
+
+    // =============== 기존 Cleaner Win RPC (사용 X) ===============
+    // 이제 EndGame이 처리하므로 호출하지 않음
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcAnnounceCleanerWin_All()
     {

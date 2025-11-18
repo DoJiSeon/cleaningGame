@@ -260,6 +260,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         {
             PenaltyVotes.Clear();
         }
+        GameRuleManager.Instance.isPenaltyPanelOpen = true;
 
         _phase = Phase.ChoosingTarget;
         _localPanelTimer = timeLimit;
@@ -301,7 +302,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             if (slideTextGO) slideTextGO.SetActive(false);
             CloseTargetPanel();
         }
-
+        GameRuleManager.Instance.isPenaltyPanelOpen = false;
         if (waitingPanel) waitingPanel.SetActive(false);
     }
 
