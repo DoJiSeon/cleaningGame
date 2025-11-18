@@ -48,6 +48,7 @@ public class NewPlayerController : NetworkBehaviour
 
     private float teleportLockUntil = 0f;
     private float pickupLockUntil = 0f;
+    [Networked] public bool IsTeleporting { get; set; }
 
     public void LockMovementForTeleport(float duration)
     {
@@ -135,6 +136,10 @@ public class NewPlayerController : NetworkBehaviour
     public override void FixedUpdateNetwork()
     {
         if (!HasInputAuthority)
+            return;
+
+        // 서버가 텔포트 중이면 이동 금지
+        if (IsTeleporting)
             return;
 
         // 텔포 직후 이동 금지
@@ -295,6 +300,32 @@ public class NewPlayerController : NetworkBehaviour
 
         _lastLiveState = live;
     }
+
+    public void TeleportToPosition(Vector3 pos, Quaternion rot)
+    {
+        if (!Object.HasStateAuthority)
+            return;
+
+        IsTeleporting = true;
+
+        characterController.enabled = false;
+
+        transform.position = pos;
+        transform.rotation = rot;
+
+        moveDirection = Vector3.zero;
+
+        characterController.enabled = true;
+
+        StartCoroutine(CoEndTeleportAfter(0.2f));
+    }
+
+    private IEnumerator CoEndTeleportAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        IsTeleporting = false;
+    }
+
 
 
 }

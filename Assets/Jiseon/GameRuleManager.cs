@@ -141,13 +141,17 @@ public class GameRuleManager : NetworkBehaviour
             {
                 if (isPenaltyPanelOpen)
                 {
+                    // 패널 열림 → 텍스트 활성화 + 실제값 표시
+                    cleanGaugeText.gameObject.SetActive(true);
                     cleanGaugeText.text = $"청소 게이지: {percent:0}%";
                 }
                 else
                 {
-                    cleanGaugeText.text = "청소 게이지: ??%";
+                    // 패널 닫힘 → 텍스트 숨김
+                    cleanGaugeText.gameObject.SetActive(false);
                 }
             }
+
 
             // 2) 10% 단위마다 ShowLocalStatus 호출
             int percent10 = Mathf.FloorToInt(percent / 10f) * 10;
@@ -349,22 +353,29 @@ public class GameRuleManager : NetworkBehaviour
     public void TeleportAllPlayersToMeetingPoint()
     {
         if (!IsHost) return;
-        if (meetingTeleportPoint == null)
-        {
-            Debug.LogWarning("[GRM] meetingTeleportPoint 설정 안 됨!");
-            return;
-        }
+        if (meetingTeleportPoint == null) return;
 
         foreach (var p in _players)
         {
             if (p == null || p.Object == null) continue;
 
-            p.Object.transform.position = meetingTeleportPoint.position;
-            p.Object.transform.rotation = meetingTeleportPoint.rotation;
+            var controller = p.Object.GetComponent<NewPlayerController>();
+            if (controller != null)
+            {
+                controller.TeleportToPosition(
+                    meetingTeleportPoint.position,
+                    meetingTeleportPoint.rotation
+                );
+            }
+            else
+            {
+                // 혹시 Controller 없으면 fallback
+                p.Object.transform.position = meetingTeleportPoint.position;
+                p.Object.transform.rotation = meetingTeleportPoint.rotation;
+            }
         }
-
-        Debug.Log("[GRM] 모든 플레이어 텔포트 완료!");
     }
+
 
 
     // =============== ★ Game Core 관련 ===============
