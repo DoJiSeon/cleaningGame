@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Cinemachine;
 using Fusion;
 using Fusion.Sockets;
 using TMPro;
@@ -18,11 +19,13 @@ public class MeetingDirector : NetworkBehaviour
     private bool _sceneChangeTriggered;
 
     // === [추가] 공용 연출 훅 ===
-    [Header("결과 연출")]
 
+    [Header("결과 연출")]
     // === 컷씬/카메라 ===
-    [SerializeField] private UnityEngine.Playables.PlayableDirector executionTimeline; // 타임라인
-    [SerializeField] private Cinemachine.CinemachineVirtualCamera vcam;               // 지목자 포커스용 VCam
+    [SerializeField] private UnityEngine.Playables.PlayableDirector executionTimeline;
+    [SerializeField] private Cinemachine.CinemachineVirtualCamera vcamVictory;  // 승리 카메라
+    [SerializeField] private Cinemachine.CinemachineVirtualCamera vcamDefeat;   // 패배 카메라
+    [SerializeField] private Cinemachine.CinemachineBrain cinemachineBrain;
 
     // === 결과 패널(UI) ===
     [SerializeField] private GameObject resultPanelLocal;      // 비활성 시작
@@ -151,7 +154,17 @@ public class MeetingDirector : NetworkBehaviour
         MeetingTimer = TickTimer.CreateFromSeconds(Runner, meetingDuration);
         _votes.Clear();
 
-        RpcStartMeeting_All(meetingPoint ? meetingPoint.position : Vector3.zero, freezeMovementDuringMeeting);
+        // ★ GameRuleManager의 텔포트 함수 사용
+        if (GameRuleManager.Instance != null)
+        {
+            GameRuleManager.Instance.TeleportAllPlayersToMeetingPoint();
+        }
+        else
+        {
+            Debug.LogWarning("[Meeting] GameRuleManager.Instance가 없어서 텔포트 실패!");
+        }
+
+        RpcStartMeeting_All(freezeMovementDuringMeeting);
     }
 
     // --- 서버(호스트)에서 회의 종료/발표 ---
@@ -199,7 +212,7 @@ public class MeetingDirector : NetworkBehaviour
             var winner = topCandidates[0];
             bool caughtSaboteur = IsSaboteur(winner);
 
-            RpcPlayExecution_All(winner.PlayerId);
+            RpcPlayExecution_All(winner.PlayerId, caughtSaboteur);
             RpcEndMeeting_All(winner.PlayerId, caughtSaboteur);
 
             IsMeetingActive = false;
@@ -273,13 +286,34 @@ public class MeetingDirector : NetworkBehaviour
 
     // === 컷씬 실행 RPC ===
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RpcPlayExecution_All(int accusedPlayerId)
+    private void RpcPlayExecution_All(int accusedPlayerId, bool caughtSaboteur)
     {
-        var t = FindAccusedTransform(accusedPlayerId);
-        if (vcam && t)
+        var me = GetLocalPlayerInfo();
+        bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        var brain = Camera.main?.GetComponent<Cinemachine.CinemachineBrain>();
+        if (brain != null)
         {
-            vcam.Follow = t;
-            vcam.LookAt = t;
+            brain.enabled = true;
+        }
+
+        // ★ VCam 선택만 하면 끝 (Follow/LookAt은 인스펙터에서 미리 설정)
+        Cinemachine.CinemachineVirtualCamera targetCam = null;
+
+        if (caughtSaboteur)
+        {
+            targetCam = iAmSaboteur ? vcamDefeat : vcamVictory;
+        }
+        else
+        {
+            targetCam = iAmSaboteur ? vcamVictory : vcamDefeat;
+        }
+
+        if (targetCam)
+        {
+            targetCam.PreviousStateIsValid = false;
+            targetCam.gameObject.SetActive(true);
+            targetCam.Priority = 100;
         }
 
         if (executionTimeline)
@@ -292,21 +326,22 @@ public class MeetingDirector : NetworkBehaviour
 
     // --- 회의 시작 연출 ---
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RpcStartMeeting_All(Vector3 tpPos, bool freeze)
-    {
-        Debug.Log("[Meeting] RpcStartMeeting_All fired on " + (Runner ? Runner.LocalPlayer.PlayerId : -1));
+private void RpcStartMeeting_All(bool freeze)  // tpPos 파라미터 제거
+{
+    Debug.Log("[Meeting] RpcStartMeeting_All fired on " + (Runner ? Runner.LocalPlayer.PlayerId : -1));
 
-        _meetingOnCached = true;
-        SetRoundTimerVisible(false);
+    _meetingOnCached = true;
+    SetRoundTimerVisible(false);
 
-        TeleportLocalOwnedCharacter(tpPos);
-        if (freeze) FreezeLocalOwnedCharacter(true);
+    // ★ 텔포트는 서버에서 이미 했으므로 로컬에서는 안 함
+    
+    if (freeze) FreezeLocalOwnedCharacter(true);
 
-        if (meetingUI) meetingUI.SetActive(true);
-        voteUI?.Rebuild(Runner);
+    if (meetingUI) meetingUI.SetActive(true);
+    voteUI?.Rebuild(Runner);
 
-        ShowFinalVoteBanner(meetingBannerText);
-    }
+    ShowFinalVoteBanner(meetingBannerText);
+}
 
     // 씬전환
     private IEnumerator CoChangeSceneViaChatManagerAfter(float sec)
