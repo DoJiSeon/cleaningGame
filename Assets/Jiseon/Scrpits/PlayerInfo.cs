@@ -14,7 +14,7 @@ public class PlayerInfo : NetworkBehaviour
     [Header("Render / UI")]
     public MeshRenderer MeshRenderer;
     public TMP_Text nameDisplayTMP;
-    public HealthBar healthBar;
+    //public HealthBar healthBar;
     public Button readyButton;
 
     [Networked, OnChangedRender(nameof(ColorChanged))]
@@ -22,9 +22,6 @@ public class PlayerInfo : NetworkBehaviour
 
     [Networked, OnChangedRender(nameof(OnNameChanged))]
     public NetworkString<_64> playerName { get; set; }
-
-    [Networked, OnChangedRender(nameof(HealthChanged))]
-    public float NetworkedHealth { get; set; } = 100;
 
     [Networked, OnChangedRender(nameof(OnReadyStateChanged))]
     public NetworkBool IsReady { get; private set; }
@@ -43,9 +40,6 @@ public class PlayerInfo : NetworkBehaviour
     void Start()
     {
         ResolveManager();
-
-        if (healthBar != null)
-            healthBar.SetMaxHealth(NetworkedHealth);
 
         // ȣ��Ʈ�� Ready ��ư ����, Ŭ��� ǥ��
         if (HasInputAuthority && readyButton != null && !_uiWired)
@@ -79,9 +73,6 @@ public class PlayerInfo : NetworkBehaviour
             transform.gameObject.name = cachedName;
         }
 
-        if (healthBar != null)
-            healthBar.SetMaxHealth(NetworkedHealth);
-
         if (_grm) _grm.RegisterPlayer(this);
     }
 
@@ -110,12 +101,6 @@ public class PlayerInfo : NetworkBehaviour
         playerName = name;
         cachedName = name;
         if (nameDisplayTMP) nameDisplayTMP.text = name;
-    }
-
-    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void DealDamageRpc(float damage)
-    {
-        NetworkedHealth = Mathf.Max(0f, NetworkedHealth - damage);
     }
 
     public void ToggleReady()
@@ -179,11 +164,6 @@ public class PlayerInfo : NetworkBehaviour
             nameDisplayTMP.text = cachedName;
     }
 
-    void HealthChanged()
-    {
-        if (healthBar != null)
-            healthBar.UpdateHealth(NetworkedHealth);
-    }
 
     void OnReadyStateChanged()
     {

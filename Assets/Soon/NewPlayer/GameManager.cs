@@ -20,6 +20,10 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
 {
     public GameObject playerPrefab;
 
+    // 입력 버퍼링을 위한 이전 프레임 상태 추적
+    private bool _prevEKeyState = false;
+    private bool _prevQKeyState = false;
+
     private void Awake()
     {
     }

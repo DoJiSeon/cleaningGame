@@ -48,6 +48,10 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
     private Multiplayerchat chatManager;
 
+    // ì…ë ¥ ë²„í¼ë§ì„ ìœ„í•œ ì´ì „ í”„ë ˆì„ ìƒíƒœ ì¶”ì 
+    private bool _prevEKeyState = false;
+    private bool _prevQKeyState = false;
+
     private void Awake()
     {
         runnerInsatance = gameObject.GetComponent<NetworkRunner>();
@@ -80,19 +84,27 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
+        // í˜„ì¬ í‚¤ ìƒíƒœ í™•ì¸ ë° Edge detection
+        bool currentE = Input.GetKey(KeyCode.E);
+        bool currentQ = Input.GetKey(KeyCode.Q);
+        bool ePressed = currentE && !_prevEKeyState;
+        bool qPressed = currentQ && !_prevQKeyState;
+        _prevEKeyState = currentE;
+        _prevQKeyState = currentQ;
+
         var data = new PlayerInputData
         {
             move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical")),
             look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")),
             jump = Input.GetKey(KeyCode.Space),
             run = Input.GetKey(KeyCode.LeftShift),
-            NextEquipPressed = Input.GetKeyDown(KeyCode.E),   // E Å° ¡æ ´ÙÀ½ Àåºñ
-            PrevEquipPressed = Input.GetKeyDown(KeyCode.Q)   // Q Å° ¡æ ÀÌÀü Àåºñ
+            NextEquipPressed = ePressed,   // E Å° ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+            PrevEquipPressed = qPressed   // Q Å° ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     };
         input.Set(data);
     }
     // -------------------------------
-    // ¹æ »ı¼º
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     // -------------------------------
     public void CreateCustomSession()
     {
@@ -114,7 +126,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (sceneIndex < 0)
         {
-            Debug.LogError($"'{gameplaySceneName}' ¾ÀÀ» Build Settings¿¡¼­ Ã£À» ¼ö ¾ø½À´Ï´Ù!");
+            Debug.LogError($"'{gameplaySceneName}' ï¿½ï¿½ï¿½ï¿½ Build Settingsï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½!");
             yield break;
         }
 
@@ -130,7 +142,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     }
 
     // -------------------------------
-    // ¹æ Âü°¡
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     // -------------------------------
     public void RequestJoinSession(SessionInfo session)
     {
@@ -158,7 +170,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         string correctPwd = prop.PropertyValue?.ToString().Trim();
         string inputPwd = passwordCheckInput.text.Trim();
 
-        Debug.Log($"ÀÔ·Â°ª: '{inputPwd}' / ÀúÀå°ª: '{correctPwd}'");
+        Debug.Log($"ï¿½Ô·Â°ï¿½: '{inputPwd}' / ï¿½ï¿½ï¿½å°ª: '{correctPwd}'");
 
         if (inputPwd == correctPwd)
         {
@@ -197,7 +209,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (sceneIndex < 0)
         {
-            Debug.LogError($"'{gameplaySceneName}' ¾À ÀÎµ¦½º¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù! Build Settings µî·Ï È®ÀÎ");
+            Debug.LogError($"'{gameplaySceneName}' ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½! Build Settings ï¿½ï¿½ï¿½ È®ï¿½ï¿½");
             yield break;
         }
 
@@ -213,7 +225,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     }
 
     // -------------------------------
-    // ·£´ı ¹æ ÀÔÀå (ºñ¹ø¹æ Á¦¿Ü)
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     // -------------------------------
     public void JoinRandomButtonPressed()
     {
@@ -224,7 +236,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (sessionList == null || sessionList.Count == 0)
         {
-            Debug.LogWarning("ÇöÀç Âü°¡ °¡´ÉÇÑ ¼¼¼ÇÀÌ ¾ø½À´Ï´Ù.");
+            Debug.LogWarning("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.");
             return;
         }
 
@@ -237,18 +249,18 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (openSessions.Count == 0)
         {
-            Debug.LogWarning("¿­¸° °ø°³ ¼¼¼ÇÀÌ ¾ø½À´Ï´Ù.");
+            Debug.LogWarning("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½.");
             return;
         }
 
         SessionInfo randomSession = openSessions[UnityEngine.Random.Range(0, openSessions.Count)];
-        Debug.Log($"·£´ıÀ¸·Î ¼±ÅÃµÈ °ø°³ ¼¼¼Ç: {randomSession.Name}");
+        Debug.Log($"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ãµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {randomSession.Name}");
 
         StartCoroutine(JoinRoomRoutine(randomSession.Name));
     }
 
     // -------------------------------
-    // ¼¼¼Ç ¸®½ºÆ® °ü¸®
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
     // -------------------------------
     public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
     {
@@ -310,7 +322,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    // ÀÌ¸§ ±â¹İÀ¸·Î ¾À ÀÎµ¦½º Ã£±â
+    // ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Îµï¿½ï¿½ï¿½ Ã£ï¿½ï¿½
     private int GetSceneIndex(string sceneName)
     {
         for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
@@ -330,7 +342,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
     }
 
     // -------------------------------
-    // Fusion Äİ¹é
+    // Fusion ï¿½İ¹ï¿½
     // -------------------------------
     public void OnConnectedToServer(NetworkRunner runner)
     {
@@ -367,7 +379,7 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
         chatManager = FindObjectOfType<Multiplayerchat>();
         if (chatManager != null)
         {
-            Debug.Log("chatManager ¿¬°áµÊ!");
+            Debug.Log("chatManager ï¿½ï¿½ï¿½ï¿½ï¿½!");
         }
     }
 

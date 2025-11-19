@@ -63,12 +63,27 @@ public class EquipManagerNet : NetworkBehaviour
         // 매 프레임 역할 상태를 확인하여 허용 아이템 목록 갱신
         RefreshAllowedByRole();
 
-        // StateAuthority(호스트/서버)에서만 입력을 처리하여 상태를 변경함
-        if (HasStateAuthority && GetInput(out PlayerInputData input))
+        // StateAuthority가 있는 오브젝트에서만 입력을 처리하여 상태를 변경함
+        // GetInput은 이 오브젝트의 InputAuthority의 입력을 가져옴
+        if (HasStateAuthority)
         {
-            if (input.NextEquipPressed) EquipNext();
-            else if (input.PrevEquipPressed) EquipPrev();
-            else if (input.SelectSlotIndex > 0) EquipSlot(input.SelectSlotIndex);
+            // GetInput이 실패할 수 있으므로 안전하게 처리
+            if (GetInput(out PlayerInputData input))
+            {
+                // 입력이 있으면 처리 (GetKeyDown은 한 프레임에만 true이므로 버퍼링된 입력에서도 작동)
+                if (input.NextEquipPressed) 
+                {
+                    EquipNext();
+                }
+                else if (input.PrevEquipPressed) 
+                {
+                    EquipPrev();
+                }
+                else if (input.SelectSlotIndex > 0) 
+                {
+                    EquipSlot(input.SelectSlotIndex);
+                }
+            }
         }
     }
 

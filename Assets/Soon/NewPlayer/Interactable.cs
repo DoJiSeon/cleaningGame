@@ -122,7 +122,7 @@ public class Interactable : NetworkBehaviour
         StartCoroutine(DespawnAfterDelay(targetId, 0.3f));  // 더 빠른 despawn
     }
 
-    private IEnumerator DespawnAfterDelay(NetworkId targetId, float delay)
+    public IEnumerator DespawnAfterDelay(NetworkId targetId, float delay)
     {
         yield return new WaitForSeconds(delay);
         var obj = Runner.FindObject(targetId);
@@ -144,7 +144,7 @@ public class Interactable : NetworkBehaviour
 
     // ����(�̺�Ʈ)�� ��Ʈ��ũ�� ��ε�ĳ��Ʈ
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RPC_PlayFX(NetworkId targetId)
+    public void RPC_PlayFX(NetworkId targetId)
     {
         var obj = Runner.FindObject(targetId);
         if (!obj) return;
@@ -167,7 +167,7 @@ public class Interactable : NetworkBehaviour
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RPC_PlayFade(NetworkId targetId, float step)
+    public void RPC_PlayFade(NetworkId targetId, float step)
     {
         var obj = Runner.FindObject(targetId);
         if (!obj) return;

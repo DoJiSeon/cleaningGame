@@ -51,8 +51,8 @@ public class RaycastAttack : NetworkBehaviour
                         return;
                     }
 
-                    Debug.Log($"플레이어 '{playerInfo.playerName}' 피격! 현재 체력: {playerInfo.NetworkedHealth}");
-                    playerInfo.DealDamageRpc(Damage);
+                    //Debug.Log($"플레이어 '{playerInfo.playerName}' 피격! 현재 체력: {playerInfo.NetworkedHealth}");
+                    //playerInfo.DealDamageRpc(Damage);
                 }
                 else
                 {
