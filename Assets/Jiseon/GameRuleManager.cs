@@ -15,7 +15,9 @@ public class GameRuleManager : NetworkBehaviour
     public TMP_Text statusText;        // 중앙 상태 (카운트다운 / Game Start!)
     public TMP_Text timerText;         // 게임 시간
     public TMP_Text playerCountText;   // 현재 인원 표시
-    public TMP_Text gameCoreCountText; // 방해자 전용 게임코어 횟수 표시
+    public RectTransform gameCoreContainer; // 방해자 전용 게임코어 이미지 컨테이너
+    public Sprite gameCoreSprite;      // 게임코어 이미지 스프라이트
+    public float gameCoreImageSpacing = 10f; // 게임코어 이미지 간격
 
 
     // ===== ★ SpawnManager UI는 사용하지 않지만 10% 알림 유지 =====
@@ -47,6 +49,10 @@ public class GameRuleManager : NetworkBehaviour
     private readonly List<PlayerInfo> _players = new();
     private readonly List<PlayerInfo> _saboteurs = new();
     private bool _uiReady;
+    
+    // 게임코어 UI 이미지 관리
+    private readonly List<UnityEngine.UI.Image> _gameCoreImages = new();
+    private int _lastDisplayedGameCoreCount = -1; // 마지막으로 표시한 게임코어 개수
 
     private const int COUNTDOWN_DURATION = 3;
     private const int GAME_DURATION = 1800;
@@ -175,7 +181,7 @@ public class GameRuleManager : NetworkBehaviour
 
     private void UpdateGameCoreCountDisplay()
     {
-        if (gameCoreCountText == null) return;
+        if (gameCoreContainer == null) return;
         if (!GameStarted) return;
 
         var localPlayer = GetLocalPlayer();
@@ -186,12 +192,82 @@ public class GameRuleManager : NetworkBehaviour
 
         if (isSaboteur)
         {
-            gameCoreCountText.gameObject.SetActive(true);
-            gameCoreCountText.text = $"게임코어: {GameCoreCount}/3";
+            gameCoreContainer.gameObject.SetActive(true);
+            
+            // GameCoreCount가 변경되었을 때만 UI 업데이트
+            if (_lastDisplayedGameCoreCount != GameCoreCount)
+            {
+                UpdateGameCoreImages(GameCoreCount);
+                _lastDisplayedGameCoreCount = GameCoreCount;
+            }
         }
         else
         {
-            gameCoreCountText.gameObject.SetActive(false);
+            gameCoreContainer.gameObject.SetActive(false);
+            // 청소부일 때는 카운트 초기화
+            if (_lastDisplayedGameCoreCount != -1)
+            {
+                _lastDisplayedGameCoreCount = -1;
+                ClearGameCoreImages();
+            }
+        }
+    }
+
+    private void UpdateGameCoreImages(int count)
+    {
+        if (gameCoreContainer == null || gameCoreSprite == null) return;
+
+        // 최대 3개까지만 생성 가능
+        int maxCount = 3;
+        count = Mathf.Clamp(count, 0, maxCount);
+
+        float imageSize = 50f; // 이미지 크기
+
+        // 필요한 이미지 개수만큼 생성
+        while (_gameCoreImages.Count < count)
+        {
+            GameObject imageObj = new GameObject("GameCoreImage");
+            imageObj.transform.SetParent(gameCoreContainer, false);
+            
+            RectTransform rectTransform = imageObj.AddComponent<RectTransform>();
+            rectTransform.sizeDelta = new Vector2(imageSize, imageSize);
+            
+            UnityEngine.UI.Image image = imageObj.AddComponent<UnityEngine.UI.Image>();
+            image.sprite = gameCoreSprite;
+            image.preserveAspect = true;
+            
+            _gameCoreImages.Add(image);
+        }
+
+        // 초과된 이미지 제거
+        while (_gameCoreImages.Count > maxCount)
+        {
+            var image = _gameCoreImages[_gameCoreImages.Count - 1];
+            _gameCoreImages.RemoveAt(_gameCoreImages.Count - 1);
+            if (image != null && image.gameObject != null)
+            {
+                Destroy(image.gameObject);
+            }
+        }
+
+        // 이미지 위치 설정 및 활성화/비활성화 처리
+        for (int i = 0; i < _gameCoreImages.Count; i++)
+        {
+            if (_gameCoreImages[i] != null)
+            {
+                RectTransform rectTransform = _gameCoreImages[i].GetComponent<RectTransform>();
+                if (rectTransform != null)
+                {
+                    // 이미지 위치 설정 (수평 배치)
+                    rectTransform.anchoredPosition = new Vector2(
+                        i * (imageSize + gameCoreImageSpacing), 
+                        0f
+                    );
+                }
+                
+                // 현재 개수보다 작은 인덱스만 활성화
+                _gameCoreImages[i].gameObject.SetActive(i < count);
+            }
         }
     }
 
@@ -333,6 +409,10 @@ public class GameRuleManager : NetworkBehaviour
         AssignRolesAndNotify();
 
         GameCoreCount = 0;
+        _lastDisplayedGameCoreCount = -1;
+        
+        // 게임 시작 시 게임코어 UI 초기화
+        ClearGameCoreImages();
     }
 
     private void AssignRolesAndNotify()
@@ -453,11 +533,24 @@ public class GameRuleManager : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcNotifyGameCoreProgress_All(int count)
     {
-        // 방해자에게만 알림 표시 (UI는 Update에서 지속적으로 표시됨)
+        // 방해자에게만 알림 표시
         var localPlayer = GetLocalPlayer();
         if (localPlayer != null && localPlayer.PlayerRole == PlayerInfo.Role.Saboteur)
         {
             ShowLocalStatus($"게임코어 {count}/3", 1.5f);
+        }
+        
+        // UI를 즉시 업데이트 (게임 종료 전에 UI가 표시되도록)
+        // GameCoreCount는 이미 네트워크로 동기화되었으므로 직접 UI 업데이트
+        if (gameCoreContainer != null && GameStarted)
+        {
+            if (localPlayer != null && localPlayer.PlayerRole == PlayerInfo.Role.Saboteur)
+            {
+                gameCoreContainer.gameObject.SetActive(true);
+                // _lastDisplayedGameCoreCount를 업데이트하여 강제로 UI 갱신
+                _lastDisplayedGameCoreCount = GameCoreCount - 1; // 한 단계 낮춰서 강제 업데이트 트리거
+                UpdateGameCoreCountDisplay();
+            }
         }
     }
 
@@ -472,7 +565,17 @@ public class GameRuleManager : NetworkBehaviour
         switch (reason)
         {
             case EndReason.GameCoreWin:
-                AnnounceImposterWin("게임코어 3개 달성");
+                // MeetingDirector를 사용한 승리 처리
+                var meetingDirector = FindObjectOfType<MeetingDirector>();
+                if (meetingDirector != null)
+                {
+                    meetingDirector.HandleGameCoreWin_Server();
+                }
+                else
+                {
+                    // MeetingDirector가 없으면 기본 메시지 표시
+                    AnnounceImposterWin("게임코어 3개 달성");
+                }
                 break;
 
             case EndReason.TimeUp:
@@ -512,5 +615,22 @@ public class GameRuleManager : NetworkBehaviour
         {
             ShowLocalStatus($"회의를 시작한다.", 1.5f);
         }
+    }
+
+    private void ClearGameCoreImages()
+    {
+        foreach (var image in _gameCoreImages)
+        {
+            if (image != null && image.gameObject != null)
+            {
+                Destroy(image.gameObject);
+            }
+        }
+        _gameCoreImages.Clear();
+    }
+
+    void OnDestroy()
+    {
+        ClearGameCoreImages();
     }
 }

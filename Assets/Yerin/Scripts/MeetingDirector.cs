@@ -365,6 +365,59 @@ public class MeetingDirector : NetworkBehaviour
         Debug.Log($"[Meeting] Cleaner 승리! 청소율: {cleanPercent:F1}%");
     }
 
+    // =============== ★ 게임코어 승리 처리 ===============
+    public void HandleGameCoreWin_Server()
+    {
+        if (!Object.HasStateAuthority) return;
+        RpcShowGameCoreWin_All();
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcShowGameCoreWin_All()
+    {
+        var me = GetLocalPlayerInfo();
+        bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        // 결과 패널 표시
+        string title = iAmSaboteur ? "방해자 성공!" : "방해자 승리…";
+        string detail = "게임코어 3개를 모두 획득했습니다.";
+
+        if (resultTitleText) resultTitleText.text = title;
+        if (resultDetailText) resultDetailText.text = detail;
+        if (resultAccusedNameText) resultAccusedNameText.text = "";
+
+        if (resultPanelLocal)
+        {
+            resultPanelLocal.SetActive(true);
+            StartCoroutine(CoShowResultPanelThenHide(2.0f));
+        }
+
+        // 컷씬 연출
+        var brain = Camera.main?.GetComponent<Cinemachine.CinemachineBrain>();
+        if (brain != null)
+        {
+            brain.enabled = true;
+        }
+
+        Cinemachine.CinemachineVirtualCamera targetCam = iAmSaboteur ? vcamVictory : vcamDefeat;
+        if (targetCam)
+        {
+            targetCam.PreviousStateIsValid = false;
+            targetCam.gameObject.SetActive(true);
+            targetCam.Priority = 100;
+        }
+
+        if (executionTimeline)
+        {
+            executionTimeline.time = 0;
+            executionTimeline.Evaluate();
+            executionTimeline.Play();
+        }
+
+        // 씬 전환
+        if (changeSceneAfterMeeting)
+            StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
+    }
     // === 컷씬 실행 RPC ===
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcPlayExecution_All(int accusedPlayerId, bool caughtSaboteur)
