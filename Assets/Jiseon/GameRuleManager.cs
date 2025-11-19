@@ -13,6 +13,7 @@ public class GameRuleManager : NetworkBehaviour
     public Button startButton;         // 호스트 전용
     public Button readyButton;         // 클라 전용
     public TMP_Text statusText;        // 중앙 상태 (카운트다운 / Game Start!)
+    public TMP_Text equipStatusText;    // 중앙 상태 (카운트다운 / Game Start!)
     public TMP_Text timerText;         // 게임 시간
     public TMP_Text playerCountText;   // 현재 인원 표시
     public RectTransform gameCoreContainer; // 방해자 전용 게임코어 이미지 컨테이너
@@ -61,6 +62,10 @@ public class GameRuleManager : NetworkBehaviour
 
     private string _localStatusOverride = null;
     private float _localStatusUntil = 0f;
+
+    // ===== 장비 상태 메시지용 변수 =====
+    private string _equipStatusOverride = null;
+    private float _equipStatusUntil = 0f;
 
     private bool IsHost => Runner != null && (Runner.IsSharedModeMasterClient || Runner.IsServer);
 
@@ -156,6 +161,21 @@ public class GameRuleManager : NetworkBehaviour
                 statusText.text = _localStatusOverride;
             else
                 statusText.text = StatusMessage.ToString();
+        }
+
+        // ===== 장비 상태 메시지 UI (EquipStatusText) =====
+        if (equipStatusText)
+        {
+            if (Time.time < _equipStatusUntil && !string.IsNullOrEmpty(_equipStatusOverride))
+            {
+                equipStatusText.text = _equipStatusOverride;
+                equipStatusText.gameObject.SetActive(true); // 텍스트가 있을 때만 활성화
+            }
+            else
+            {
+                equipStatusText.text = "";
+                equipStatusText.gameObject.SetActive(false); // 없으면 비활성화 (깔끔하게)
+            }
         }
 
         // ===== 시간 종료 체크 =====
@@ -282,6 +302,12 @@ public class GameRuleManager : NetworkBehaviour
     {
         _localStatusOverride = text;
         _localStatusUntil = Time.time + Mathf.Max(0.1f, seconds);
+    }
+
+    public void ShowEquipStatus(string text, float seconds)
+    {
+        _equipStatusOverride = text;
+        _equipStatusUntil = Time.time + Mathf.Max(0.1f, seconds);
     }
 
     // =============== Player 등록 ===============

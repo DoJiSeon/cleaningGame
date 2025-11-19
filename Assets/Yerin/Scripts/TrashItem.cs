@@ -13,8 +13,17 @@ public class TrashItem : MonoBehaviour
     [Header("Effects (Optional)")]
     [SerializeField] private GameObject pickupEffectPrefab;
     [SerializeField] private AudioClip pickupSound;
-
+    [SerializeField] private AudioClip spawnSound;
     private bool isPickedUp = false;
+
+
+    public void OnSpawn()
+    {
+        if (spawnSound != null)
+        {
+            AudioSource.PlayClipAtPoint(spawnSound, transform.position);
+        }
+    }
 
     /// <summary>
     /// 플레이어가 쓰레기를 주웠을 때 호출 (외부에서 호출)

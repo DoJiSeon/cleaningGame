@@ -48,7 +48,7 @@ public class Interactable : NetworkBehaviour
     {
         if (_suppressInteractWhileFx) return;
         // NetworkBehaviour가 초기화되지 않았으면 실행하지 않음
-        if (Runner == null || !Object) return;
+        //if (Runner == null || !Object) return;
         
         var no = GetComponent<NetworkObject>();
         if (no == null) no = GetComponentInParent<NetworkObject>();
@@ -67,29 +67,10 @@ public class Interactable : NetworkBehaviour
             Debug.LogWarning($"[Interactable] RPC_RequestInteract: target not found {targetId}");
             return;
         }
-        //// 2) ��û ���� �÷��̾� ��������
-        //var playerObj = Runner.GetPlayerObject(_.Source);
-        //if (playerObj == null) return;
 
-        // 3) �÷��̾��� EquipManagerNet Ȯ��
-        //var equip = playerObj.GetComponent<EquipManagerNet>();
-        //if (equip == null) return;
-
-        //if (equip.Equipped != EquipmentId.Hand)
-        //{
-        //    // Hand�� �ƴϸ� ���� (���ϸ� �α�/UI �ǵ��)
-        //    Debug.Log("Hand �ƴ�");
-        //    return;
-            
-        //}
-
-
-        // ��� Ŭ�󿡼� ����(�̺�Ʈ) ����
         RPC_PlayFX(targetId);
-        // ��� Ŭ�󿡼� ���̵� ����
         RPC_PlayFade(targetId, 0.02f);
-        // ���̵� �ð� ���� �� despawn
-        // 재상호작용 방지: 즉시 콜라이더 비활성화
+
         try
         {
             foreach (var col in obj.GetComponentsInChildren<Collider>(true))
@@ -101,7 +82,7 @@ public class Interactable : NetworkBehaviour
     }
 
     // Dirty 상호작용용 RPC (더 빠른 Fade)
-    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void RPC_RequestDirtyInteract(NetworkId targetId, RpcInfo _ = default)
     {
         var obj = Runner.FindObject(targetId);

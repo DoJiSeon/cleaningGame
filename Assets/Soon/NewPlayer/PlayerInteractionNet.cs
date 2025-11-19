@@ -180,7 +180,7 @@ public class PlayerInteractionNet : NetworkBehaviour
 
     private void ShowWarning(string msg)
     {
-        if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus(msg, 1.2f);
+        if (GameRuleManager.Instance) GameRuleManager.Instance.ShowEquipStatus(msg, 1.2f);
     }
 
     void CheckInteractionLocal()
@@ -251,7 +251,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
 
         if (_player != null)
-            _player.LockMovementForPickup(1.5f);
+            _player.LockMovementForPickup(1.8f);
 
         _animator.SetTrigger("pickTrigger");
 
@@ -290,7 +290,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
 
         if (_player != null)
-            _player.LockMovementForPickup(1.5f);
+            _player.LockMovementForPickup(2f);
 
         _animator.SetTrigger("cleanTrigger");
 
@@ -303,6 +303,12 @@ public class PlayerInteractionNet : NetworkBehaviour
                 col.enabled = false;
         }
         catch { }
+
+        TrashItem trashItem = obj.GetComponent<TrashItem>();
+        if (trashItem != null)
+        {
+            trashItem.OnPickedUp();
+        }
 
         interactable.StartCoroutine(interactable.DespawnAfterDelay(targetId, 0.3f));
     }
@@ -362,6 +368,13 @@ public class PlayerInteractionNet : NetworkBehaviour
             {
                 interactable.SetSpawnedByPlayer(Object.InputAuthority);
             }
+        }
+
+        var trashItem = spawnedObj.GetComponent<TrashItem>();
+        if (trashItem != null)
+        {
+            // 이 함수는 Start()와 달리, 여기서 명시적으로 호출할 때만 실행됩니다.
+            trashItem.OnSpawn();
         }
     }
 
