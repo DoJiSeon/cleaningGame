@@ -13,7 +13,7 @@ public class SpawnManager : NetworkBehaviour
     [Header("Debug")]
     [SerializeField] private bool showDebugInfo = true;
 
-    // ⭐ [Networked] 프로퍼티 (Header 제거)
+    // ⭐ 네트워크 프로퍼티
     [Networked] private int TotalSpawnedCount { get; set; }
     [Networked] private int CleanedCount { get; set; }
 
@@ -30,14 +30,20 @@ public class SpawnManager : NetworkBehaviour
         }
     }
 
-    void Start()
+    // ⭐ Start() 제거하고 Spawned()로 이동
+    public override void Spawned()
     {
+        base.Spawned();
         UpdateUI();
     }
 
     void Update()
     {
-        UpdateUI();
+        // ⭐ Spawned 되었을 때만 UI 업데이트
+        if (Object != null && Object.IsValid)
+        {
+            UpdateUI();
+        }
 
         // 디버그 테스트용 (서버만)
         if (Object != null && Object.HasStateAuthority)
@@ -107,6 +113,10 @@ public class SpawnManager : NetworkBehaviour
 
     void UpdateUI()
     {
+        // ⭐ 네트워크 오브젝트가 유효할 때만 실행
+        if (Object == null || !Object.IsValid)
+            return;
+
         float percentage = GetCleanPercentage();
         int percentInt = Mathf.RoundToInt(percentage);
 
@@ -123,6 +133,10 @@ public class SpawnManager : NetworkBehaviour
 
     public float GetCleanPercentage()
     {
+        // ⭐ 네트워크 오브젝트가 유효하지 않으면 0 반환
+        if (Object == null || !Object.IsValid)
+            return 0f;
+
         if (TotalSpawnedCount <= 0)
             return 0f;
 
@@ -143,7 +157,17 @@ public class SpawnManager : NetworkBehaviour
     public void ResetRoundCounts() => ResetRound();
     public float GetDeSpawnPercentage() => GetCleanPercentage();
 
-    public int GetTotalSpawned() => TotalSpawnedCount;
-    public int GetCleanedCount() => CleanedCount;
-    public int GetRemainingTrash() => TotalSpawnedCount - CleanedCount;
+    public int GetTotalSpawned()
+    {
+        if (Object == null || !Object.IsValid) return 0;
+        return TotalSpawnedCount;
+    }
+
+    public int GetCleanedCount()
+    {
+        if (Object == null || !Object.IsValid) return 0;
+        return CleanedCount;
+    }
+
+    public int GetRemainingTrash() => GetTotalSpawned() - GetCleanedCount();
 }
