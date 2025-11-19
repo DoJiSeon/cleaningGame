@@ -141,23 +141,20 @@ public class MeetingDirector : NetworkBehaviour
         // 라운드 타임아웃
         if (!IsMeetingActive && RoundTimer.Expired(Runner))
         {
-            float percent = Mathf.Clamp01(SpawnManager.Instance?.GetDeSpawnPercentage() ?? 0f);
-            // gage 90% 이상이면 바로 승리
-            if (percent >= 90f)
+            float percent = SpawnManager.Instance?.GetDeSpawnPercentage() ?? 0f;
+
+            // ⭐ 90% 이상이면 바로 승리
+            if (percent >= requiredPercent)  // 0.90과 비교
             {
                 _cleanerWinAnnounced = true;
-                RpcAnnounceCleanerWin(-1, percent);  // accusedPlayerId -1 = 지목자 없음
+                RpcAnnounceCleanerWin(-1, percent * 100f);  // 표시용으로 100 곱하기
 
                 if (changeSceneAfterMeeting)
                     StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
             }
-            else if (percent < requiredPercent)
+            else  // 90% 미만일 때 회의 시작
             {
                 StartMeeting_Server();
-            }
-            else
-            {
-                RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
             }
         }
 

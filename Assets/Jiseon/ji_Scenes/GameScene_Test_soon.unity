@@ -175,7 +175,8 @@ Transform:
   m_LocalPosition: {x: 27.926325, y: -4.700595, z: 31.873196}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 861786262}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5361643
@@ -193,7 +194,8 @@ MonoBehaviour:
   SortKey: 2592288495
   ObjectInterest: 1
   Flags: 262145
-  NestedObjects: []
+  NestedObjects:
+  - {fileID: 861786263}
   NetworkedBehaviours:
   - {fileID: 5361641}
   ForceRemoteRenderTimeframe: 0
@@ -16596,6 +16598,7 @@ GameObject:
   m_Component:
   - component: {fileID: 243020769}
   - component: {fileID: 243020768}
+  - component: {fileID: 243020770}
   m_Layer: 0
   m_Name: SpawnManager
   m_TagString: Untagged
@@ -16633,6 +16636,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &243020770
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 243020767}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  SortKey: 3860388671
+  ObjectInterest: 1
+  Flags: 262145
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 243020768}
+  ForceRemoteRenderTimeframe: 0
 --- !u!114 &247280583
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25116,7 +25138,7 @@ MonoBehaviour:
   roundTimerText: {fileID: 869586141}
   meetingTimerText: {fileID: 869586140}
   roundDuration: 120
-  requiredPercent: 0.9
+  requiredPercent: 0.199
   meetingPoint: {fileID: 1230108154}
   meetingUI: {fileID: 38751073}
   freezeMovementDuringMeeting: 1
@@ -60660,12 +60682,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 861786260}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 27.926325, y: -4.700595, z: 31.873196}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 5361642}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &861786263
 MonoBehaviour:
@@ -143854,7 +143876,6 @@ SceneRoots:
   - {fileID: 2139802449}
   - {fileID: 1201417324}
   - {fileID: 5361642}
-  - {fileID: 861786262}
   - {fileID: 115736952}
   - {fileID: 1628376526}
   - {fileID: 1981397259}
