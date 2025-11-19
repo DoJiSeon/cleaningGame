@@ -50,25 +50,59 @@ public class PlayerInteractionNet : NetworkBehaviour
 
 				if (_current != null)
             {
-					// Hand 상태에서만 상호작용(줍기) 허용
-					if (equipped != EquipmentId.Hand)
+					// NetworkObject 찾기 (공통)
+					var no = _current.GetComponent<NetworkObject>();
+					if (no == null) no = _current.GetComponentInParent<NetworkObject>();
+					
+					if (no == null)
 					{
-						// 선택: 간단 안내
-						if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("Hand 상태에서만 줍기가 가능합니다", 1.2f);
+						Debug.LogWarning("Interactable has no NetworkObject. Consider making it networked.");
 						return;
 					}
 
-                // 플레이어를 카메라 방향으로 회전 (클라이언트에서 처리)
-                if (_player != null)
-                {
-                    _player.RotateToCameraDirection();
-                    _player.PlayPickUpCameraMove(new Vector3(0, -0.5f, 0.2f), 1.0f);
-                }
+					// Sponge 상태: Dirty 타입만 상호작용 가능 (치우기)
+					if (equipped == EquipmentId.Sponge)
+					{
+						// Dirty 타입이 아니면 상호작용 불가
+						if (_current.interactableType != InteractableType.Dirty)
+						{
+							if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("Sponge 상태에서는 Dirty만 치울 수 있습니다", 1.2f);
+							return;
+						}
 
-                var no = _current.GetComponent<NetworkObject>();
-                if (no == null) no = _current.GetComponentInParent<NetworkObject>();
-                if (no != null) RPC_RequestInteract(no.Id);
-                else Debug.LogWarning("Interactable has no NetworkObject. Consider making it networked.");
+						// 플레이어를 카메라 방향으로 회전 (클라이언트에서 처리)
+						if (_player != null)
+						{
+							_player.RotateToCameraDirection();
+						}
+
+						RPC_RequestDirtyInteract(no.Id);
+						return;
+					}
+
+					// Hand 상태: Trash 타입만 상호작용 가능 (줍기)
+					if (equipped == EquipmentId.Hand)
+					{
+						// Trash 타입이 아니면 상호작용 불가
+						if (_current.interactableType != InteractableType.Trash)
+						{
+							if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("Hand 상태에서는 Trash만 줍을 수 있습니다", 1.2f);
+							return;
+						}
+
+						// 플레이어를 카메라 방향으로 회전 (클라이언트에서 처리)
+						if (_player != null)
+						{
+							_player.RotateToCameraDirection();
+							_player.PlayPickUpCameraMove(new Vector3(0, -0.5f, 0.2f), 1.0f);
+						}
+
+						RPC_RequestInteract(no.Id);
+						return;
+					}
+
+					// Hand 상태가 아니면 안내 메시지
+					if (GameRuleManager.Instance) GameRuleManager.Instance.ShowLocalStatus("Hand 상태에서만 줍기가 가능합니다", 1.2f);
             }
             else
             {
@@ -179,6 +213,36 @@ public class PlayerInteractionNet : NetworkBehaviour
 
         // 상호작용 성공 시 일정 확률로 게임코어 획득 처리 (서버에서 판정)
 		TryAwardGameCore_Server(interactedPos, interactedRot, info);
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    private void RPC_RequestDirtyInteract(NetworkId targetId, RpcInfo info = default)
+    {
+			// 서버 권한에서 최종 검증: Sponge 상태만 허용
+			if (_equip != null && _equip.Equipped != EquipmentId.Sponge) return;
+
+        var obj = Runner.FindObject(targetId);
+        if (obj == null) return;
+
+        var interactable = obj.GetComponent<Interactable>();
+        if (interactable == null || !interactable.enabled) return;
+
+        // 서버에서도 태그 재검증(치트 방지)
+        var anyCol = interactable.GetComponentInChildren<Collider>();
+        if (anyCol == null || !anyCol.CompareTag(TAG)) return;
+
+        // 거리 검증
+        float max = playerReach + 0.75f;
+        if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
+        
+        // Clean 애니메이션 중 이동 금지 (회전은 클라이언트에서 이미 처리됨)
+        if (_player != null)
+            _player.LockMovementForPickup(1.5f);
+        
+        _animator.SetTrigger("cleanTrigger");
+        
+        // Interactable의 RPC를 직접 호출 (서버에서만 실행)
+        interactable.RPC_RequestDirtyInteract(targetId);
     }
 
     private void TrySpawnTrash()

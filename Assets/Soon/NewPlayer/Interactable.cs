@@ -3,8 +3,17 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 
+public enum InteractableType
+{
+    Trash,      // 쓰레기 (Hand 상태에서 줍기)
+    Dirty       // 더러움 (Sponge 상태에서 치우기)
+}
+
 public class Interactable : NetworkBehaviour
 {
+    [Header("Interactable Type")]
+    public InteractableType interactableType = InteractableType.Trash;  // 기본값은 Trash
+    
     public string message;
     public UnityEvent onInteraction;   // FX/����/�ִϸ� ���� (���� Interact() ���� ����)
     public Renderer MyRenderer;
@@ -30,6 +39,19 @@ public class Interactable : NetworkBehaviour
             RPC_RequestInteract(no.Id);   // �� �̺�Ʈ ȣ�� ����
     }
 
+
+    public void DirtyInteract()
+    {
+        if (_suppressInteractWhileFx) return;
+        // NetworkBehaviour가 초기화되지 않았으면 실행하지 않음
+        if (Runner == null || !Object) return;
+        
+        var no = GetComponent<NetworkObject>();
+        if (no == null) no = GetComponentInParent<NetworkObject>();
+        if (no != null && HasInputAuthority)
+            RPC_RequestDirtyInteract(no.Id);   // �� �̺�Ʈ ȣ�� ����
+    }
+
     // Ŭ��/���� ������ ȣ�� ����, ó���ڴ� StateAuthority
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RPC_RequestInteract(NetworkId targetId, RpcInfo _ = default)
@@ -41,7 +63,6 @@ public class Interactable : NetworkBehaviour
             Debug.LogWarning($"[Interactable] RPC_RequestInteract: target not found {targetId}");
             return;
         }
-
         //// 2) ��û ���� �÷��̾� ��������
         //var playerObj = Runner.GetPlayerObject(_.Source);
         //if (playerObj == null) return;
@@ -73,6 +94,32 @@ public class Interactable : NetworkBehaviour
         catch { }
 
         StartCoroutine(DespawnAfterDelay(targetId, 0.5f));
+    }
+
+    // Dirty 상호작용용 RPC (더 빠른 Fade)
+    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    public void RPC_RequestDirtyInteract(NetworkId targetId, RpcInfo _ = default)
+    {
+        var obj = Runner.FindObject(targetId);
+        if (obj == null)
+        {
+            Debug.LogWarning($"[Interactable] RPC_RequestDirtyInteract: target not found {targetId}");
+            return;
+        }
+
+        // Dirty 상호작용: 더 빠른 Fade (0.1f step 사용)
+        RPC_PlayFX(targetId);
+        RPC_PlayFade(targetId, 0.1f);  // 더 빠른 fade (기존 0.02f -> 0.1f)
+        
+        // 재상호작용 방지: 즉시 콜라이더 비활성화
+        try
+        {
+            foreach (var col in obj.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
+        }
+        catch { }
+
+        StartCoroutine(DespawnAfterDelay(targetId, 0.3f));  // 더 빠른 despawn
     }
 
     private IEnumerator DespawnAfterDelay(NetworkId targetId, float delay)
