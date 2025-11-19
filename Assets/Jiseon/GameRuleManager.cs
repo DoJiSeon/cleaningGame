@@ -16,11 +16,7 @@ public class GameRuleManager : NetworkBehaviour
     public TMP_Text timerText;         // 게임 시간
     public TMP_Text playerCountText;   // 현재 인원 표시
 
-    [Header("Clean Gauge UI")]
-    [SerializeField] private TMP_Text cleanGaugeText;
-    // 제재 패널 열림 여부 (OptionButtonUI에서 알려줌)
-    [HideInInspector] public bool isPenaltyPanelOpen = false;
-    // 이전에 알려준 10단위 청소율 기록
+    // ===== ★ SpawnManager UI는 사용하지 않지만 10% 알림 유지 =====
     private int lastNotifiedPercent10 = 0;
 
     [Networked] private TickTimer CountdownTimer { get; set; }
@@ -31,7 +27,7 @@ public class GameRuleManager : NetworkBehaviour
     // 게임코어 진행상태
     [Networked] private int GameCoreCount { get; set; }
 
-    // ======== ★ 텔포트 위치 추가 ========
+    // ======== ★ 텔포트 위치 ========
     [Header("Teleport Settings")]
     public Transform meetingTeleportPoint;
 
@@ -130,31 +126,13 @@ public class GameRuleManager : NetworkBehaviour
             if (playerCountText) playerCountText.text = $"{currentPlayers} / {maxPlayers}";
         }
 
-        // === ★ 청소 게이지 표시 + 10% 단위 알림 ===
+        // ========== ★ 10% 단위 청소율 안내만 유지 ==========
         if (SpawnManager.Instance != null)
         {
             float percent = SpawnManager.Instance.GetCleanPercentage();
 
-            // 1) 평소에는 "??%"
-            //    제재 패널 열렸을 때만 실제 퍼센트 공개
-            if (cleanGaugeText != null)
-            {
-                if (isPenaltyPanelOpen)
-                {
-                    // 패널 열림 → 텍스트 활성화 + 실제값 표시
-                    cleanGaugeText.gameObject.SetActive(true);
-                    cleanGaugeText.text = $"청소 게이지: {percent:0}%";
-                }
-                else
-                {
-                    // 패널 닫힘 → 텍스트 숨김
-                    cleanGaugeText.gameObject.SetActive(false);
-                }
-            }
-
-
-            // 2) 10% 단위마다 ShowLocalStatus 호출
             int percent10 = Mathf.FloorToInt(percent / 10f) * 10;
+
             if (percent10 >= 10 && percent10 <= 100 && percent10 != lastNotifiedPercent10)
             {
                 ShowLocalStatus($"청소 게이지 {percent10}% 달성!", 1.5f);
@@ -162,8 +140,7 @@ public class GameRuleManager : NetworkBehaviour
             }
         }
 
-
-
+        // ===== 상태 메시지 UI =====
         if (statusText)
         {
             if (Time.time < _localStatusUntil && !string.IsNullOrEmpty(_localStatusOverride))
@@ -172,12 +149,13 @@ public class GameRuleManager : NetworkBehaviour
                 statusText.text = StatusMessage.ToString();
         }
 
-        // === ★ 시간 종료 체크 ===
+        // ===== 시간 종료 체크 =====
         if (GameStarted && GameTimer.IsRunning && GameTimer.Expired(Runner))
         {
             EndGame(EndReason.TimeUp);
         }
 
+        // ===== Ready 버튼 텍스트 =====
         if (!GameStarted && !IsHost)
         {
             var local = GetLocalPlayer();
@@ -201,6 +179,7 @@ public class GameRuleManager : NetworkBehaviour
         _localStatusUntil = Time.time + Mathf.Max(0.1f, seconds);
     }
 
+    // =============== Player 등록 ===============
     public void RegisterPlayer(PlayerInfo pi)
     {
         if (!_players.Contains(pi))
@@ -244,7 +223,7 @@ public class GameRuleManager : NetworkBehaviour
         if (clientCount == 0)
             return true;
 
-        return clientCount > 0 && readyClients == clientCount;
+        return readyClients == clientCount;
     }
 
     public void UpdateStartButtonState()
@@ -284,7 +263,6 @@ public class GameRuleManager : NetworkBehaviour
 
         StatusMessage = "";
 
-        // ★ 텔포트
         TeleportAllPlayersToMeetingPoint();
         StartGame();
     }
@@ -337,6 +315,7 @@ public class GameRuleManager : NetworkBehaviour
         Debug.Log($"[GRM] Roles assigned. Saboteurs: {saboteurCount}/{n}");
     }
 
+    // ========== ★ GetLocalPlayer 복구 ==========
     private PlayerInfo GetLocalPlayer()
     {
         foreach (var p in _players)
@@ -347,39 +326,50 @@ public class GameRuleManager : NetworkBehaviour
         return null;
     }
 
-
-    // =============== ★ 텔포트 기능 ===============
-
     public void TeleportAllPlayersToMeetingPoint()
     {
         if (!IsHost) return;
         if (meetingTeleportPoint == null) return;
 
-        foreach (var p in _players)
-        {
-            if (p == null || p.Object == null) continue;
+        // 호스트에서만 한 번 호출 → 모든 클라에서 로컬 플레이어 텔포
+        RpcTeleportAllToMeetingPoint(meetingTeleportPoint.position, meetingTeleportPoint.rotation);
+    }
 
-            var controller = p.Object.GetComponent<NewPlayerController>();
-            if (controller != null)
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcTeleportAllToMeetingPoint(Vector3 pos, Quaternion rot)
+    {
+        // 각 클라이언트에서 자기 플레이어만 텔포
+        var localController = FindLocalPlayerController();
+        if (localController != null)
+        {
+            localController.TeleportToPosition(pos, rot);
+            Debug.Log("[GRM] RpcTeleportAllToMeetingPoint → 로컬 플레이어 텔포 완료");
+        }
+        else
+        {
+            Debug.Log("[GRM] RpcTeleportAllToMeetingPoint → 로컬 플레이어 컨트롤러를 찾지 못함");
+        }
+    }
+
+
+    private NewPlayerController FindLocalPlayerController()
+    {
+        var all = FindObjectsOfType<NewPlayerController>(true);
+        foreach (var c in all)
+        {
+            var no = c.GetComponent<NetworkObject>();
+            if (no != null && no.HasInputAuthority)
             {
-                controller.TeleportToPosition(
-                    meetingTeleportPoint.position,
-                    meetingTeleportPoint.rotation
-                );
-            }
-            else
-            {
-                // 혹시 Controller 없으면 fallback
-                p.Object.transform.position = meetingTeleportPoint.position;
-                p.Object.transform.rotation = meetingTeleportPoint.rotation;
+                return c;
             }
         }
+        return null;
     }
 
 
 
     // =============== ★ Game Core 관련 ===============
-
     public void AddGameCore_Server()
     {
         if (!IsHost) return;
@@ -390,7 +380,6 @@ public class GameRuleManager : NetworkBehaviour
 
         if (GameCoreCount >= 3)
         {
-            // ★ 게임코어 3개 → 게임 종료
             EndGame(EndReason.GameCoreWin);
         }
     }
@@ -401,9 +390,7 @@ public class GameRuleManager : NetworkBehaviour
         ShowLocalStatus($"게임코어 {count}/3", 1.5f);
     }
 
-
     // =============== ★ EndGame 시스템 ===============
-
     public void EndGame(EndReason reason)
     {
         if (!IsHost) return;
@@ -435,7 +422,7 @@ public class GameRuleManager : NetworkBehaviour
     private void HandleEndByTimeUp()
     {
         float percent = SpawnManager.Instance.GetCleanPercentage();
-        float goal = 70f;  // 원하는 목표치 (필요하면 public 변수로 빼도 됨)
+        float goal = 70f;
 
         if (percent >= goal)
         {
@@ -443,20 +430,7 @@ public class GameRuleManager : NetworkBehaviour
         }
         else
         {
-            //투표를 시작합니다잉
             ShowLocalStatus($"회의를 시작한다.", 1.5f);
-
         }
-    }
-
-
-    // =============== 기존 Cleaner Win RPC (사용 X) ===============
-    // 이제 EndGame이 처리하므로 호출하지 않음
-    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RpcAnnounceCleanerWin_All()
-    {
-        StatusMessage = "Cleaner 승리!";
-        ShowLocalStatus("Cleaner 승리!", 3f);
-        if (timerText) timerText.text = "끝";
     }
 }

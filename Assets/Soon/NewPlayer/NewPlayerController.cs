@@ -158,6 +158,12 @@ public class NewPlayerController : NetworkBehaviour
 
     private void Move(PlayerInputData inputData)
     {
+        if (IsTeleporting)
+        {
+            characterAnimator.SetFloat("speed", 0f);
+            return;
+        }
+
         Vector3 camForward = playerCamera.transform.forward;
         camForward.y = 0f;
         camForward.Normalize();
@@ -303,22 +309,38 @@ public class NewPlayerController : NetworkBehaviour
 
     public void TeleportToPosition(Vector3 pos, Quaternion rot)
     {
-        if (!Object.HasStateAuthority)
-            return;
 
+        // 1) 현재 Tick에서 이동 완전 차단
         IsTeleporting = true;
 
+        // 2) 이동 입력/중력을 완전히 끔
+        moveDirection = Vector3.zero;
+
+        // 3) CC 잠시 비활성화
         characterController.enabled = false;
 
+        // 4) 정확한 절달 위치로 이동
         transform.position = pos;
         transform.rotation = rot;
 
-        moveDirection = Vector3.zero;
+        // 5) 다음 FixedUpdateNetwork가 시작되기 전에 CC 다시 활성화
+        StartCoroutine(EnableCC_NextFrame());
+    }
 
+    private IEnumerator EnableCC_NextFrame()
+    {
+        // 1프레임 기다리고 CC 활성화 (FixedUpdate와 충돌 방지)
+        yield return null;
         characterController.enabled = true;
 
-        StartCoroutine(CoEndTeleportAfter(0.2f));
+        // CC 안정화 위해 1프레임 더 대기
+        yield return null;
+
+        // 텔레포트 완료
+        IsTeleporting = false;
     }
+
+
 
     private IEnumerator CoEndTeleportAfter(float delay)
     {

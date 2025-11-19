@@ -260,7 +260,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         {
             PenaltyVotes.Clear();
         }
-        GameRuleManager.Instance.isPenaltyPanelOpen = true;
+        SpawnManager.Instance.spawnPercentText.gameObject.SetActive(true);
 
         _phase = Phase.ChoosingTarget;
         _localPanelTimer = timeLimit;
@@ -302,7 +302,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             if (slideTextGO) slideTextGO.SetActive(false);
             CloseTargetPanel();
         }
-        GameRuleManager.Instance.isPenaltyPanelOpen = false;
+        SpawnManager.Instance.spawnPercentText.gameObject.SetActive(false);
         if (waitingPanel) waitingPanel.SetActive(false);
     }
 
@@ -317,6 +317,9 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         if (slideTextGO) slideTextGO.SetActive(false);
         CloseTargetPanel();
         if (waitingPanel) waitingPanel.SetActive(false);
+
+        if (SpawnManager.Instance && SpawnManager.Instance.spawnPercentText)
+            SpawnManager.Instance.spawnPercentText.gameObject.SetActive(false);
     }
 
     private void EnterPenaltyPhase()
