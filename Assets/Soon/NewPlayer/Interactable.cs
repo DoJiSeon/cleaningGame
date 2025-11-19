@@ -18,6 +18,10 @@ public class Interactable : NetworkBehaviour
     public UnityEvent onInteraction;   // FX/����/�ִϸ� ���� (���� Interact() ���� ����)
     public Renderer MyRenderer;
 
+    // 스폰한 플레이어 정보 (플레이어가 직접 스폰한 쓰레기인지 확인용)
+    // PlayerRef.None이면 기본(라운드 시작 시 존재) 쓰레기
+    [Networked] public PlayerRef SpawnedByPlayer { get; private set; }
+
     // RPC 연출 중 UnityEvent가 다시 Interact()를 호출하여 재귀되는 것을 막기 위한 가드
     private bool _suppressInteractWhileFx;
 
@@ -192,6 +196,15 @@ public class Interactable : NetworkBehaviour
 
     public void DisableOutline() { if (outline) outline.enabled = false; }
     public void EnableOutline() { if (outline) outline.enabled = true; }
+
+    // 스폰한 플레이어 정보 설정 (서버에서만 호출)
+    public void SetSpawnedByPlayer(PlayerRef playerRef)
+    {
+        if (HasStateAuthority)
+        {
+            SpawnedByPlayer = playerRef;
+        }
+    }
 }
 
 

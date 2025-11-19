@@ -15,6 +15,8 @@ public class GameRuleManager : NetworkBehaviour
     public TMP_Text statusText;        // 중앙 상태 (카운트다운 / Game Start!)
     public TMP_Text timerText;         // 게임 시간
     public TMP_Text playerCountText;   // 현재 인원 표시
+    public TMP_Text gameCoreCountText; // 방해자 전용 게임코어 횟수 표시
+
 
     // ===== ★ SpawnManager UI는 사용하지 않지만 10% 알림 유지 =====
     private int lastNotifiedPercent10 = 0;
@@ -26,6 +28,7 @@ public class GameRuleManager : NetworkBehaviour
 
     // 게임코어 진행상태
     [Networked] private int GameCoreCount { get; set; }
+
 
     // ======== ★ 텔포트 위치 ========
     [Header("Teleport Settings")]
@@ -165,7 +168,33 @@ public class GameRuleManager : NetworkBehaviour
                 if (tmp) tmp.text = local.IsReady ? "Wait..." : "Ready";
             }
         }
+
+        // ===== 방해자 전용 게임코어 횟수 표시 =====
+        UpdateGameCoreCountDisplay();
     }
+
+    private void UpdateGameCoreCountDisplay()
+    {
+        if (gameCoreCountText == null) return;
+        if (!GameStarted) return;
+
+        var localPlayer = GetLocalPlayer();
+        if (localPlayer == null) return;
+
+        // 방해자일 때만 표시
+        bool isSaboteur = localPlayer.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        if (isSaboteur)
+        {
+            gameCoreCountText.gameObject.SetActive(true);
+            gameCoreCountText.text = $"게임코어: {GameCoreCount}/3";
+        }
+        else
+        {
+            gameCoreCountText.gameObject.SetActive(false);
+        }
+    }
+
 
     void LateUpdate()
     {
@@ -424,7 +453,12 @@ public class GameRuleManager : NetworkBehaviour
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcNotifyGameCoreProgress_All(int count)
     {
-        ShowLocalStatus($"게임코어 {count}/3", 1.5f);
+        // 방해자에게만 알림 표시 (UI는 Update에서 지속적으로 표시됨)
+        var localPlayer = GetLocalPlayer();
+        if (localPlayer != null && localPlayer.PlayerRole == PlayerInfo.Role.Saboteur)
+        {
+            ShowLocalStatus($"게임코어 {count}/3", 1.5f);
+        }
     }
 
     // =============== ★ EndGame 시스템 ===============
@@ -438,7 +472,7 @@ public class GameRuleManager : NetworkBehaviour
         switch (reason)
         {
             case EndReason.GameCoreWin:
-                AnnounceCleanerWin("게임코어 3개 달성");
+                AnnounceImposterWin("게임코어 3개 달성");
                 break;
 
             case EndReason.TimeUp:
@@ -454,6 +488,15 @@ public class GameRuleManager : NetworkBehaviour
         if (timerText) timerText.text = "끝";
 
         Debug.Log($"[GRM] Cleaner 승리: {detail}");
+    }
+
+    private void AnnounceImposterWin(string detail)
+    {
+        StatusMessage = "Imposter 승리!";
+        ShowLocalStatus($"Imposter 승리!\n({detail})", 4f);
+        if (timerText) timerText.text = "끝";
+
+        Debug.Log($"[GRM] Imposter 승리: {detail}");
     }
 
     private void HandleEndByTimeUp()
