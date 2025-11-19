@@ -77,6 +77,11 @@ public class MeetingDirector : NetworkBehaviour
     private Coroutine _uiTimerRoutine;
 
     private bool _wasLive = false;
+    private bool _cleanerWinAnnounced = false;
+    private Coroutine _resultPanelCoroutine;
+    private bool _isShowingResult = false; 
+
+
     private bool IsGameLiveNow()
     {
         return GameRuleManager.Instance != null && GameRuleManager.Instance.IsGameLive;
@@ -86,6 +91,10 @@ public class MeetingDirector : NetworkBehaviour
     public override void Spawned()
     {
         _meetingOnCached = false;
+        _cleanerWinAnnounced = false;
+        _isShowingResult = false;  // ⭐ 추가
+        _sceneChangeTriggered = false;  // ⭐ 추가
+
         if (Object.HasStateAuthority)
             RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
 
@@ -119,6 +128,7 @@ public class MeetingDirector : NetworkBehaviour
             }
             RoundTimer = TickTimer.None;
             _wasLive = false;
+            _cleanerWinAnnounced = false; 
             return;
         }
 
@@ -132,8 +142,23 @@ public class MeetingDirector : NetworkBehaviour
         if (!IsMeetingActive && RoundTimer.Expired(Runner))
         {
             float percent = Mathf.Clamp01(SpawnManager.Instance?.GetDeSpawnPercentage() ?? 0f);
-            if (percent < requiredPercent) StartMeeting_Server();
-            else RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+            // gage 90% 이상이면 바로 승리
+            if (percent >= 90f)
+            {
+                _cleanerWinAnnounced = true;
+                RpcAnnounceCleanerWin(-1, percent);  // accusedPlayerId -1 = 지목자 없음
+
+                if (changeSceneAfterMeeting)
+                    StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
+            }
+            else if (percent < requiredPercent)
+            {
+                StartMeeting_Server();
+            }
+            else
+            {
+                RoundTimer = TickTimer.CreateFromSeconds(Runner, roundDuration);
+            }
         }
 
         // 회의 타임아웃
@@ -237,11 +262,10 @@ public class MeetingDirector : NetworkBehaviour
         if (finalVoteBanner) finalVoteBanner.SetActive(false);
     }
 
-    // === 결과 표시 RPC ===
+    // RpcEndMeeting_All 수정
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcEndMeeting_All(int accusedPlayerId, bool caughtSaboteur)
     {
-
         HideFinalVoteBanner();
 
         _meetingOnCached = false;
@@ -268,20 +292,77 @@ public class MeetingDirector : NetworkBehaviour
         if (resultDetailText) resultDetailText.text = detail;
         if (resultAccusedNameText) resultAccusedNameText.text = $"지목: {accusedName}";
 
-        if (resultPanelLocal)
+        // ⭐ 중복 방지
+        if (_resultPanelCoroutine != null)
         {
-            resultPanelLocal.SetActive(true);
-            StartCoroutine(CoShowResultPanelThenHide(2.0f));
+            StopCoroutine(_resultPanelCoroutine);
+            _resultPanelCoroutine = null;
+        }
+
+        if (resultPanelLocal && !_isShowingResult)
+        {
+            _resultPanelCoroutine = StartCoroutine(CoShowResultPanelThenHide(2.0f));
         }
 
         if (Runner != null && Runner.LocalPlayer.PlayerId == accusedPlayerId)
         {
             Debug.Log("[Meeting] 내가 지목됨!");
-            // TODO: 추방/관전 전환 처리
         }
 
-        if (changeSceneAfterMeeting)
+        if (changeSceneAfterMeeting && !_sceneChangeTriggered)
             StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
+    }
+
+    // RpcAnnounceCleanerWin 수정
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcAnnounceCleanerWin(int accusedPlayerId, float cleanPercent)
+    {
+        Debug.Log($"[Meeting] RpcAnnounceCleanerWin 호출됨! Frame: {Time.frameCount}");
+
+        HideFinalVoteBanner();
+        _meetingOnCached = false;
+        SetRoundTimerVisible(true);
+
+        if (meetingUI) meetingUI.SetActive(false);
+
+        var me = GetLocalPlayerInfo();
+        bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        string title = iAmSaboteur ? "방해자 패배…" : "정화 성공!";
+        string detail = $"청소율 {cleanPercent:F0}% 달성!";
+
+        if (resultTitleText) resultTitleText.text = title;
+        if (resultDetailText) resultDetailText.text = detail;
+        if (resultAccusedNameText) resultAccusedNameText.text = "";
+
+        // ⭐ 중복 방지
+        if (_resultPanelCoroutine != null)
+        {
+            StopCoroutine(_resultPanelCoroutine);
+            _resultPanelCoroutine = null;
+        }
+
+        if (resultPanelLocal && !_isShowingResult)
+        {
+            _resultPanelCoroutine = StartCoroutine(CoShowResultPanelThenHide(2.0f));
+        }
+
+        // 카메라 연출
+        var brain = Camera.main?.GetComponent<Cinemachine.CinemachineBrain>();
+        if (brain != null)
+        {
+            brain.enabled = true;
+        }
+
+        Cinemachine.CinemachineVirtualCamera targetCam = iAmSaboteur ? vcamDefeat : vcamVictory;
+        if (targetCam)
+        {
+            targetCam.PreviousStateIsValid = false;
+            targetCam.gameObject.SetActive(true);
+            targetCam.Priority = 100;
+        }
+
+        Debug.Log($"[Meeting] Cleaner 승리! 청소율: {cleanPercent:F1}%");
     }
 
     // === 컷씬 실행 RPC ===
@@ -362,12 +443,20 @@ private void RpcStartMeeting_All(bool freeze)  // tpPos 파라미터 제거
             Debug.LogWarning("[Meeting] chatManager(Multiplayerchat) 를 찾지 못해 씬 전환 실패");
         }
     }
-
     private IEnumerator CoShowResultPanelThenHide(float showSec)
     {
-        resultPanelLocal.SetActive(true);
+        Debug.Log($"[Meeting] CoShowResultPanelThenHide 시작 - {showSec}초");
+
+        _isShowingResult = true;  // ⭐ 플래그 설정
+
+        if (resultPanelLocal) resultPanelLocal.SetActive(true);
         yield return new WaitForSecondsRealtime(showSec);
-        resultPanelLocal.SetActive(false);
+        if (resultPanelLocal) resultPanelLocal.SetActive(false);
+
+        _resultPanelCoroutine = null;
+        _isShowingResult = false;  // ⭐ 플래그 해제
+
+        Debug.Log($"[Meeting] CoShowResultPanelThenHide 끝");
     }
 
     // --- 투표 제출: 각 클라 → 서버 ---
