@@ -20,6 +20,11 @@ public class Multiplayerchat : NetworkBehaviour
 
     [Header("Chat Panel")]
     public GameObject chatPanel;
+    
+    [Header("Chat Sound")]
+    public AudioClip chatSound;
+    private AudioSource audioSource;
+
 
     private Dictionary<string, List<string>> chatLogs = new Dictionary<string, List<string>>();
     private readonly List<GameObject> _renderedMessages = new();
@@ -39,6 +44,18 @@ public class Multiplayerchat : NetworkBehaviour
             // input.onEndEdit.AddListener(_ => SubmitFromInput());
         }
     }
+    void Start()
+    {
+        audioSource = gameObject.AddComponent<AudioSource>();
+    }
+    private void PlayChatSound()
+    {
+        if (chatSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(chatSound);
+        }
+    }
+
 
     void OnDestroy()
     {
@@ -258,6 +275,8 @@ public class Multiplayerchat : NetworkBehaviour
         {
             RPC_SendWhisper(username, target, message);
         }
+
+        PlayChatSound();
     }
 
     [Rpc(RpcSources.All, RpcTargets.All)]
@@ -267,6 +286,8 @@ public class Multiplayerchat : NetworkBehaviour
         AppendToChat("ALL", formatted);
         if (currentChannel == "ALL")
             AddMessageToUI(formatted);
+
+        PlayChatSound();
     }
 
     [Rpc(RpcSources.All, RpcTargets.All)]
@@ -290,6 +311,8 @@ public class Multiplayerchat : NetworkBehaviour
 
             if (currentChannel == channelKey)
                 AddMessageToUI(formatted);
+
+            PlayChatSound();
         }
     }
 
