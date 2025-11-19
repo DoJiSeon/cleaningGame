@@ -263,8 +263,34 @@ public class GameRuleManager : NetworkBehaviour
 
         StatusMessage = "";
 
-        TeleportAllPlayersToMeetingPoint();
-        StartGame();
+        // 순서 변경: 먼저 입력 차단, 그 다음 텔레포트
+        RpcFreezeAllPlayers(true);  // 1. 먼저 freeze
+
+        yield return new WaitForSeconds(0.1f);  // 2. RPC 도착 대기
+
+        TeleportAllPlayersToMeetingPoint();  // 3. 텔레포트
+
+        yield return new WaitForSeconds(0.3f);  // 4. 텔레포트 안착
+
+        StartGame();  // 5. 게임 시작
+
+        RpcFreezeAllPlayers(false);  // 6. freeze 해제
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RpcFreezeAllPlayers(bool freeze)
+    {
+        var allControllers = FindObjectsOfType<NewPlayerController>();
+        foreach (var controller in allControllers)
+        {
+            if (controller != null && controller.HasInputAuthority)
+            {
+                if (freeze)
+                    controller.LockMovementForTeleport(2f);  // 충분히 긴 시간
+                else
+                    controller.LockMovementForTeleport(0f);  // 즉시 해제
+            }
+        }
     }
 
     private void StartGame()
@@ -331,8 +357,19 @@ public class GameRuleManager : NetworkBehaviour
         if (!IsHost) return;
         if (meetingTeleportPoint == null) return;
 
-        // 호스트에서만 한 번 호출 → 모든 클라에서 로컬 플레이어 텔포
-        RpcTeleportAllToMeetingPoint(meetingTeleportPoint.position, meetingTeleportPoint.rotation);
+        Vector3 targetPos = meetingTeleportPoint.position;
+        Quaternion targetRot = meetingTeleportPoint.rotation;
+
+        // 등록된 모든 플레이어 텔레포트
+        foreach (var playerInfo in _players)
+        {
+            if (playerInfo != null && playerInfo.TryGetComponent<NewPlayerController>(out var controller))
+            {
+                controller.TeleportToPosition(targetPos, targetRot);
+            }
+        }
+
+        Debug.Log($"[GRM] {_players.Count}명 텔레포트 완료");
     }
 
 
