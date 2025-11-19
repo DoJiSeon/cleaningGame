@@ -52,7 +52,7 @@ public class MeetingDirector : NetworkBehaviour
 
     [Header("라운드/회의 설정")]
     public float roundDuration = 150f;                 // 제한시간(초)
-    [Range(0f, 1f)] public float requiredPercent = 0.90f; // 90%
+    [Range(0f, 1f)] public float requiredPercent = 0.9f; // 90%
     public Transform meetingPoint;                     // 회의장 TP 지점(바닥 Transform)
 
     [Header("로컬 UI 훅(선택)")]
@@ -144,10 +144,10 @@ public class MeetingDirector : NetworkBehaviour
             float percent = SpawnManager.Instance?.GetDeSpawnPercentage() ?? 0f;
 
             // ⭐ 90% 이상이면 바로 승리
-            if (percent >= requiredPercent)  // 0.90과 비교
+            if (percent*0.01 >= requiredPercent)  // 0.90과 비교
             {
                 _cleanerWinAnnounced = true;
-                RpcAnnounceCleanerWin(-1, percent * 100f);  // 표시용으로 100 곱하기
+                RpcAnnounceCleanerWin(-1, percent);
 
                 if (changeSceneAfterMeeting)
                     StartCoroutine(CoChangeSceneViaChatManagerAfter(changeSceneDelay));
