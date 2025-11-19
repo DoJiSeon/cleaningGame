@@ -374,7 +374,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         if (trashItem != null)
         {
             // 이 함수는 Start()와 달리, 여기서 명시적으로 호출할 때만 실행됩니다.
-            trashItem.OnSpawn();
+            //trashItem.OnSpawn();
         }
     }
 

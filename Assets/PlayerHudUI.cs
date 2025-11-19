@@ -7,11 +7,15 @@ public class PlayerHudUI : MonoBehaviour
     public static PlayerHudUI Instance { get; private set; }
 
     [Header("UI Components")]
-    [SerializeField] private Image equipmentIconImage; // ºÎ¸ğ: ¾ÆÀÌÄÜ
-    [SerializeField] private Image cooldownImage;      // ÀÚ½Ä: ÄğÅ¸ÀÓ ¿À¹ö·¹ÀÌ (¿©±â¿¡ ¿¬°á!)
+    [SerializeField] private Image equipmentIconImage; // ï¿½Î¸ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    [SerializeField] private Image cooldownImage;      // ï¿½Ú½ï¿½: ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½â¿¡ ï¿½ï¿½ï¿½ï¿½!)
 
     [Header("Sprite Mapping")]
     [SerializeField] private List<EquipmentSpriteData> spriteList;
+
+    [Header("UI ì ê¸ˆ ì˜µì…˜")]
+    [SerializeField] private Image uiLockMask;          // ì ê¸ˆ ì˜¤ë²„ë ˆì´
+    [Range(0f, 1f)] [SerializeField] private float lockedDimAlpha = 0.35f; // ì ê¸ˆ ì¤‘ ì•„ì´ì½˜ íˆ¬ëª…ë„
 
     private Dictionary<EquipmentId, Sprite> _spriteDict;
 
@@ -34,13 +38,13 @@ public class PlayerHudUI : MonoBehaviour
         }
 
         UpdateEquipmentIcon(EquipmentId.None);
-        UpdateCooldown(0, 1); // ½ÃÀÛÇÒ ¶§ ÄğÅ¸ÀÓ 0À¸·Î ÃÊ±âÈ­
+        UpdateCooldown(0, 1); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ 0ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
     }
 
-    // Àåºñ ¾ÆÀÌÄÜ º¯°æ
+    // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     public void UpdateEquipmentIcon(EquipmentId id)
     {
-        // Àåºñ°¡ ¹Ù²î¸é ÄğÅ¸ÀÓ UI´Â ÀÏ´Ü ÃÊ±âÈ­(¾È º¸ÀÌ°Ô) ÇÏ´Â °ÍÀÌ ¾ÈÀüÇÔ
+        // ï¿½ï¿½ï¿½ ï¿½Ù²ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ UIï¿½ï¿½ ï¿½Ï´ï¿½ ï¿½Ê±ï¿½È­(ï¿½ï¿½ ï¿½ï¿½ï¿½Ì°ï¿½) ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (cooldownImage != null) cooldownImage.fillAmount = 0;
 
         if (_spriteDict.TryGetValue(id, out Sprite iconSprite) && iconSprite != null)
@@ -48,7 +52,7 @@ public class PlayerHudUI : MonoBehaviour
             equipmentIconImage.sprite = iconSprite;
             equipmentIconImage.enabled = true;
 
-            // ¾ÆÀÌÄÜÀÌ ÄÑÁö¸é ÄğÅ¸ÀÓ ÀÌ¹ÌÁöµµ (ÇÊ¿äÇÏ´Ù¸é) °°ÀÌ ÄÑÁÜ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½Ì¹ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½Ê¿ï¿½ï¿½Ï´Ù¸ï¿½) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             if (cooldownImage != null) cooldownImage.enabled = true;
         }
         else
@@ -58,20 +62,42 @@ public class PlayerHudUI : MonoBehaviour
         }
     }
 
-    // ¡Ú ÄğÅ¸ÀÓ ¾÷µ¥ÀÌÆ® ÇÔ¼ö (¿ÜºÎ¿¡¼­ È£Ãâ)
-    // current: ÇöÀç ³²Àº ½Ã°£, max: ÀüÃ¼ ÄğÅ¸ÀÓ ½Ã°£
+    // ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½Ô¼ï¿½ (ï¿½ÜºÎ¿ï¿½ï¿½ï¿½ È£ï¿½ï¿½)
+    // current: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½, max: ï¿½ï¿½Ã¼ ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½Ã°ï¿½
     public void UpdateCooldown(float current, float max)
     {
         if (cooldownImage == null) return;
 
         if (current <= 0 || max <= 0)
         {
-            cooldownImage.fillAmount = 0; // ÄğÅ¸ÀÓ ³¡³² (Åõ¸íÇØÁü)
+            cooldownImage.fillAmount = 0; // ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
         }
         else
         {
-            // ³²Àº ½Ã°£ ºñÀ²¸¸Å­ Ã¤¿ì±â (0.0 ~ 1.0)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å­ Ã¤ï¿½ï¿½ï¿½ (0.0 ~ 1.0)
             cooldownImage.fillAmount = current / max;
         }
+    }
+
+    // UI ì ê¸ˆ ì‹œê°ì  íš¨ê³¼ ì ìš©
+    public void ApplyLockVisual(bool locked)
+    {
+        // ì•„ì´ì½˜ íë¦¬ê¸°
+        if (equipmentIconImage != null)
+        {
+            var c = equipmentIconImage.color;
+            c.a = locked ? lockedDimAlpha : 1f;
+            equipmentIconImage.color = c;
+        }
+        if (cooldownImage != null)
+        {
+            var c2 = cooldownImage.color;
+            c2.a = locked ? lockedDimAlpha : 1f;
+            cooldownImage.color = c2;
+        }
+
+        // ì˜¤ë²„ë ˆì´ í‘œì‹œ(ì„ íƒ)
+        if (uiLockMask != null)
+            uiLockMask.gameObject.SetActive(locked);
     }
 }

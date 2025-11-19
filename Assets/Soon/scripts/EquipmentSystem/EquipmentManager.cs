@@ -36,15 +36,6 @@ public class EquipmentManager : MonoBehaviour
     [Header("플레이어 애니메이터")]
     public Animator playerAnimator;
 
-    //추가
-    [Header("UI 잠금 옵션")]
-    public Image uiLockMask;          // 잠금 오버레이
-    [Range(0f, 1f)] public float lockedDimAlpha = 0.35f; // 잠금 중 아이콘 투명도
-
-    private bool _isUILocked = false;
-    private float _uiLockUntil = 0f;
-    private EquipmentState _stateBeforeLock = EquipmentState.None;
-
     [Header("임포스터: 쓰레기 프리팹")]
     public GameObject[] trashPrefab;
     public float trashSpawnDistance = 2f;
@@ -85,22 +76,6 @@ public class EquipmentManager : MonoBehaviour
 
     void Update()
     {
-        //추가
-        // UI 잠금 중: 입력 전부 무시
-        if (_isUILocked)
-        {
-            if (Time.time >= _uiLockUntil)
-            {
-                UnlockUI();
-            }
-            else
-            {
-                // 잠금 중엔 쿨다운 UI만 유지하고 입력은 전부 무시
-                UpdateCooldownUI();
-                return;
-            }
-        }
-
         if (Input.GetKeyDown(KeyCode.Q))
         {
             currentIndex = (currentIndex - 1 + availableEquipments.Count) % availableEquipments.Count;
@@ -215,71 +190,5 @@ public class EquipmentManager : MonoBehaviour
         }
         fill = 1f - Mathf.Clamp01(elapsed / cooldown);
         coolDownImage.fillAmount = fill;
-    }
-
-    // 추가
-    public void LockUI(float seconds)
-    {
-        if (_isUILocked && Time.time < _uiLockUntil)
-        {
-            // 이미 잠금 중이면 시간만 연장
-            _uiLockUntil = Mathf.Max(_uiLockUntil, Time.time + seconds);
-            return;
-        }
-
-        _isUILocked = true;
-        _uiLockUntil = Time.time + seconds;
-
-        // 현재 상태 저장 후, 입력 완전 차단을 위해 맨손으로 전환
-        _stateBeforeLock = currentState;
-        // 아이콘/쿨다운은 보이되 "사용 불가" 느낌만 주고, 실제 입력은 위에서 return 처리
-        ForceSetNoneForLock();
-
-        ApplyLockVisual(true);
-    }
-
-    private void UnlockUI()
-    {
-        _isUILocked = false;
-        _uiLockUntil = 0f;
-
-        // 잠금 전 상태로 복귀
-        RestoreStateAfterLock();
-
-        ApplyLockVisual(false);
-    }
-
-    private void ForceSetNoneForLock()
-    {
-        // 시각적으로는 None(맨손)으로 돌려 사용 불가 느낌 강화 (원치 않으면 주석)
-        int noneIdx = availableEquipments.IndexOf(EquipmentState.None);
-        if (noneIdx >= 0) SetEquipment(noneIdx);
-    }
-
-    private void RestoreStateAfterLock()
-    {
-        int idx = availableEquipments.IndexOf(_stateBeforeLock);
-        if (idx >= 0) SetEquipment(idx);
-    }
-
-    private void ApplyLockVisual(bool locked)
-    {
-        // 아이콘 흐리기
-        if (equipmentIconImage != null)
-        {
-            var c = equipmentIconImage.color;
-            c.a = locked ? lockedDimAlpha : 1f;
-            equipmentIconImage.color = c;
-        }
-        if (coolDownImage != null)
-        {
-            var c2 = coolDownImage.color;
-            c2.a = locked ? lockedDimAlpha : 1f;
-            coolDownImage.color = c2;
-        }
-
-        // 오버레이 표시(선택)
-        if (uiLockMask != null)
-            uiLockMask.gameObject.SetActive(locked);
     }
 }

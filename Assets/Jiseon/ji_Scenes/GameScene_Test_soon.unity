@@ -66659,8 +66659,6 @@ MonoBehaviour:
   spongeIcon: {fileID: 21300000, guid: ee6f5db932a7b8042a0ac2b0ef78b0d1, type: 3}
   trashModeIcon: {fileID: 21300000, guid: 9ffd36be96288e347b90ab3973490a76, type: 3}
   playerAnimator: {fileID: 1961948299}
-  uiLockMask: {fileID: 869586137}
-  lockedDimAlpha: 0.227
   trashPrefab:
   - {fileID: 6050456093760686271, guid: 1125ade159568774fabaea18648529ce, type: 3}
   - {fileID: 7377003811093875828, guid: aa7a5e6f5619e454cbf84bede35b40f5, type: 3}
@@ -113073,6 +113071,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: ee6f5db932a7b8042a0ac2b0ef78b0d1, type: 3}
   - id: 3
     sprite: {fileID: 21300000, guid: 9ffd36be96288e347b90ab3973490a76, type: 3}
+  uiLockMask: {fileID: 869586137}
+  lockedDimAlpha: 0.35
 --- !u!1001 &1676081314
 PrefabInstance:
   m_ObjectHideFlags: 0

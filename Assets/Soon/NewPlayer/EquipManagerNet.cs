@@ -34,6 +34,11 @@ public class EquipManagerNet : NetworkBehaviour
 
     private EquipmentId _lastEquipped; // 로컬 렌더링용 이전 상태 캐싱 (변화 감지용)
 
+    // UI 잠금 관련
+    private bool _isUILocked = false;
+    private float _uiLockUntil = 0f;
+    private EquipmentId _stateBeforeLock = EquipmentId.None;
+
     public event Action<EquipmentId> OnEquipChanged;
 
     public override void Spawned()
@@ -60,6 +65,20 @@ public class EquipManagerNet : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
+        // UI 잠금 중: 입력 전부 무시
+        if (_isUILocked)
+        {
+            if (Runner != null && Runner.SimulationTime >= _uiLockUntil)
+            {
+                UnlockUI();
+            }
+            else
+            {
+                // 잠금 중엔 입력은 전부 무시
+                return;
+            }
+        }
+
         // 매 프레임 역할 상태를 확인하여 허용 아이템 목록 갱신
         RefreshAllowedByRole();
 
@@ -259,5 +278,63 @@ public class EquipManagerNet : NetworkBehaviour
         if (handObj) handObj.SetActive(id == EquipmentId.Hand);
         if (spongeObj) spongeObj.SetActive(id == EquipmentId.Sponge);
         if (trashThrowObj) trashThrowObj.SetActive(id == EquipmentId.TrashThrow);
+    }
+
+    // ---- UI 잠금 관련 메서드 ----
+
+    public void LockUI(float seconds)
+    {
+        if (Runner == null) return;
+
+        if (_isUILocked && Runner.SimulationTime < _uiLockUntil)
+        {
+            // 이미 잠금 중이면 시간만 연장
+            _uiLockUntil = Mathf.Max(_uiLockUntil, (float)Runner.SimulationTime + seconds);
+            return;
+        }
+
+        _isUILocked = true;
+        _uiLockUntil = (float)Runner.SimulationTime + seconds;
+
+        // 현재 상태 저장 후, 입력 완전 차단을 위해 맨손으로 전환
+        _stateBeforeLock = Equipped;
+        // 아이콘/쿨다운은 보이되 "사용 불가" 느낌만 주고, 실제 입력은 위에서 return 처리
+        ForceSetNoneForLock();
+
+        if (HasInputAuthority && PlayerHudUI.Instance != null)
+        {
+            PlayerHudUI.Instance.ApplyLockVisual(true);
+        }
+    }
+
+    private void UnlockUI()
+    {
+        _isUILocked = false;
+        _uiLockUntil = 0f;
+
+        // 잠금 전 상태로 복귀
+        RestoreStateAfterLock();
+
+        if (HasInputAuthority && PlayerHudUI.Instance != null)
+        {
+            PlayerHudUI.Instance.ApplyLockVisual(false);
+        }
+    }
+
+    private void ForceSetNoneForLock()
+    {
+        // 시각적으로는 None(맨손)으로 돌려 사용 불가 느낌 강화
+        if (HasStateAuthority)
+        {
+            SetEquipped(EquipmentId.Hand);
+        }
+    }
+
+    private void RestoreStateAfterLock()
+    {
+        if (HasStateAuthority)
+        {
+            SetEquipped(_stateBeforeLock);
+        }
     }
 }

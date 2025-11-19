@@ -713,7 +713,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
             case 3: // UI 잠금
                 {
-                    var equip = FindObjectOfType<EquipmentManager>(true);
+                    var equip = FindObjectOfType<EquipManagerNet>(true);
                     if (equip) equip.LockUI(dur);
                     if (ui) ui.Show(DebuffType.UILock, dur);
                     break;
