@@ -73,6 +73,20 @@ public class NewPlayerController : NetworkBehaviour
         yaw = targetY;
     }
 
+    // 특정 위치를 향해 플레이어 회전
+    public void RotateToPosition(Vector3 targetPosition)
+    {
+        Vector3 direction = targetPosition - transform.position;
+        direction.y = 0f; // Y축은 무시하고 수평 방향만
+        if (direction.sqrMagnitude > 0.001f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction.normalized);
+            float targetY = targetRotation.eulerAngles.y;
+            transform.rotation = Quaternion.Euler(0f, targetY, 0f);
+            yaw = targetY;
+        }
+    }
+
 
     // (임시) 서버가 스폰 시 인스펙터 값 적용 중이라면 그대로 유지
     public void ServerSetRole(PlayerRole role)

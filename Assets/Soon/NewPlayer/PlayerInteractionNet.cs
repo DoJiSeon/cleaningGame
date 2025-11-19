@@ -16,19 +16,18 @@ public class PlayerInteractionNet : NetworkBehaviour
     [SerializeField] private Animator _animator;
 
     [Header("Cooldown Settings")]
-    [SerializeField] private float interactCooldown = 1.0f; // 줍기(Hand) 쿨타임
-    [SerializeField] private float cleanCooldown = 1.5f;    // 닦기(Sponge) 쿨타임
-    [SerializeField] private float spawnCooldown = 2.0f;    // 버리기(TrashThrow) 쿨타임
+    [SerializeField] private float interactCooldown = 1.0f;
+    [SerializeField] private float cleanCooldown = 1.5f;
+    [SerializeField] private float spawnCooldown = 2.0f;
 
-    // 내부 쿨타임 계산용 변수 (다음 사용 가능 시간)
     private float _nextInteractTime;
     private float _nextCleanTime;
     private float _nextSpawnTime;
 
     [Header("Trash (Prototype)")]
     [SerializeField] private GameObject[] trashPrefabs;
-    [SerializeField] private float trashForwardOffset = 1.6f;
-    [SerializeField] private float trashDropHeight = 1.0f;
+    // [변경] 기존 단순 오프셋 대신 레이캐스트 거리 사용
+    [SerializeField] private float spawnRayDistance = 5.0f;
     [SerializeField] private LayerMask trashGroundMask = ~0;
 
     [Header("Game Core")]
@@ -38,6 +37,14 @@ public class PlayerInteractionNet : NetworkBehaviour
     [SerializeField] private float gameCoreSpinSpeedY = 180f;
     [SerializeField] private float gameCoreHeightOffset = 0.15f;
 
+    [Header("Debug Gizmos")]
+    [SerializeField] private bool showGizmos = true; // 인스펙터에서 켜고 끌 수 있게
+    private Vector3 _debugRayStart;
+    private Vector3 _debugRayDir;
+    private bool _debugHit;
+    private Vector3 _debugPos;
+    private Quaternion _debugRot;
+    private Vector3 _debugHitPoint;
     public override void Spawned()
     {
         _player = GetComponent<NewPlayerController>();
@@ -51,18 +58,53 @@ public class PlayerInteractionNet : NetworkBehaviour
     {
         if (!HasInputAuthority) return;
 
-        // [추가] 매 프레임 UI에 쿨타임 정보 업데이트
         UpdateCooldownUI();
-
         CheckInteractionLocal();
+
+        // ★ [추가] 매 프레임 기즈모 데이터를 갱신합니다 (미리보기 기능)
+        if (showGizmos)
+        {
+            UpdateGizmoPreview();
+        }
 
         if (Input.GetKeyDown(KeyCode.R))
         {
             HandleInput();
         }
+
+
     }
 
-    // [추가] 현재 장비 상태에 따라 UI에 쿨타임 정보를 전달하는 함수
+    private void UpdateGizmoPreview()
+    {
+        if (_cam == null) return;
+
+        // 1. 실제 생성 로직과 똑같은 레이 정보 사용
+        Ray ray = new Ray(_cam.transform.position, _cam.transform.forward);
+
+        _debugRayStart = ray.origin;
+        _debugRayDir = ray.direction;
+
+        // 2. 레이캐스트 (Player 레이어 마스크 꼭 확인!)
+        if (Physics.Raycast(ray, out RaycastHit hit, spawnRayDistance, trashGroundMask))
+        {
+            // 닿으면 그 위치
+            _debugHit = true;
+            _debugHitPoint = hit.point;
+            _debugPos = hit.point; // 바닥에 딱 붙은 위치
+        }
+        else
+        {
+            // 안 닿으면 허공 (2m 앞)
+            _debugHit = false;
+            _debugPos = ray.GetPoint(2.0f);
+        }
+
+        // 3. 회전 미리보기 (카메라 Y축)
+        float targetY = _cam.transform.eulerAngles.y;
+        _debugRot = Quaternion.Euler(0f, targetY, 0f);
+    }
+
     private void UpdateCooldownUI()
     {
         if (PlayerHudUI.Instance == null) return;
@@ -71,7 +113,6 @@ public class PlayerInteractionNet : NetworkBehaviour
         float remainingTime = 0f;
         float maxTime = 1f;
 
-        // 현재 장비에 따라 어떤 쿨타임을 보여줄지 결정
         switch (equipped)
         {
             case EquipmentId.Hand:
@@ -91,11 +132,9 @@ public class PlayerInteractionNet : NetworkBehaviour
                 break;
         }
 
-        // 남은 시간이 음수가 되지 않도록 처리 후 UI 전달
         PlayerHudUI.Instance.UpdateCooldown(Mathf.Max(0f, remainingTime), maxTime);
     }
 
-    // 입력 처리 로직 분리 (가독성을 위해)
     private void HandleInput()
     {
         var equipped = _equip ? _equip.Equipped : EquipmentId.Hand;
@@ -111,7 +150,7 @@ public class PlayerInteractionNet : NetworkBehaviour
                 return;
             }
 
-            // --- Sponge (닦기) ---
+            // --- Sponge ---
             if (equipped == EquipmentId.Sponge)
             {
                 if (_current.interactableType != InteractableType.Dirty)
@@ -119,20 +158,14 @@ public class PlayerInteractionNet : NetworkBehaviour
                     ShowWarning("닦기 상태에서는 오물만 치울 수 있습니다!");
                     return;
                 }
-
-                // 쿨타임 체크
                 if (Time.time < _nextCleanTime) return;
 
-                if (_player != null) _player.RotateToCameraDirection();
-
                 RPC_RequestDirtyInteract(no.Id);
-
-                // 쿨타임 설정
                 _nextCleanTime = Time.time + cleanCooldown;
                 return;
             }
 
-            // --- Hand (줍기) ---
+            // --- Hand ---
             if (equipped == EquipmentId.Hand)
             {
                 if (_current.interactableType != InteractableType.Trash)
@@ -140,19 +173,21 @@ public class PlayerInteractionNet : NetworkBehaviour
                     ShowWarning("줍기 상태에서는 오물을 닦을 수 없습니다!");
                     return;
                 }
-
-                // 쿨타임 체크
                 if (Time.time < _nextInteractTime) return;
 
+                // ★ 쓰레기 위치로 플레이어 회전 (클라이언트에서 즉시)
+                if (_player != null && _current != null)
+                {
+                    _player.RotateToPosition(_current.transform.position);
+                }
+
+                // 카메라 연출
                 if (_player != null)
                 {
-                    _player.RotateToCameraDirection();
                     _player.PlayPickUpCameraMove(new Vector3(0, -0.5f, 0.2f), 1.0f);
                 }
 
                 RPC_RequestInteract(no.Id);
-
-                // 쿨타임 설정
                 _nextInteractTime = Time.time + interactCooldown;
                 return;
             }
@@ -161,19 +196,31 @@ public class PlayerInteractionNet : NetworkBehaviour
         }
         else
         {
-            // --- TrashThrow (버리기/스폰) ---
+            // --- TrashThrow ---
             if (equipped != EquipmentId.TrashThrow)
             {
                 ShowWarning("쓰레기 생성 상태일 때만 생성이 가능합니다!");
                 return;
             }
-
-            // 쿨타임 체크
             if (Time.time < _nextSpawnTime) return;
 
-            TrySpawnTrash();
+            // ★ [중요] 플레이어 회전 전에 카메라 정보를 먼저 저장!
+            // 카메라가 플레이어의 자식이라면, 플레이어 회전 후에는 카메라의 월드 방향이 바뀔 수 있습니다.
+            Vector3 camPos = _cam != null ? _cam.transform.position : Vector3.zero;
+            Vector3 camForward = _cam != null ? _cam.transform.forward : Vector3.forward;
+            float camY = _cam != null ? _cam.transform.eulerAngles.y : 0f;
 
-            // 쿨타임 설정
+            // 저장해둔 회전 전 카메라 정보로 쓰레기 생성 위치 계산
+            Vector3 spawnPos = CalculateSpawnPosition(camPos, camForward);
+            
+            // ★ 생성 위치로 플레이어 회전 (클라이언트에서 즉시)
+            if (_player != null)
+            {
+                _player.RotateToPosition(spawnPos);
+            }
+
+            // 저장해둔 회전 전 카메라 정보로 쓰레기 생성
+            TrySpawnTrash(camPos, camForward, camY);
             _nextSpawnTime = Time.time + spawnCooldown;
         }
     }
@@ -247,7 +294,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         var anyCol = interactable.GetComponentInChildren<Collider>();
         if (anyCol == null || !anyCol.CompareTag(TAG)) return;
 
-        float max = playerReach + 0.75f;
+        float max = playerReach + 1.0f; // 약간의 오차 허용
         if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
 
         if (_player != null)
@@ -258,6 +305,12 @@ public class PlayerInteractionNet : NetworkBehaviour
         Vector3 interactedPos = interactable.transform.position;
         Quaternion interactedRot = interactable.transform.rotation;
 
+        // ★ 쓰레기 위치로 플레이어 회전 (서버에서도 회전 - 클라이언트는 이미 회전함)
+        if (_player != null)
+        {
+            _player.RotateToPosition(interactedPos);
+        }
+
         TrashItem trashItem = obj.GetComponent<TrashItem>();
         if (trashItem != null)
         {
@@ -265,9 +318,7 @@ public class PlayerInteractionNet : NetworkBehaviour
         }
 
         interactable.Interact();
-        
-        // 기본 쓰레기(라운드 시작 시 존재)인지 확인
-        // SpawnedByPlayer가 PlayerRef.None이면 기본 쓰레기
+
         bool isDefaultTrash = interactable.SpawnedByPlayer == PlayerRef.None;
         TryAwardGameCore_Server(interactedPos, interactedRot, info, isDefaultTrash);
     }
@@ -282,12 +333,6 @@ public class PlayerInteractionNet : NetworkBehaviour
 
         var interactable = obj.GetComponent<Interactable>();
         if (interactable == null || !interactable.enabled) return;
-
-        var anyCol = interactable.GetComponentInChildren<Collider>();
-        if (anyCol == null || !anyCol.CompareTag(TAG)) return;
-
-        float max = playerReach + 0.75f;
-        if ((Object.transform.position - interactable.transform.position).sqrMagnitude > max * max) return;
 
         if (_player != null)
             _player.LockMovementForPickup(2f);
@@ -304,102 +349,139 @@ public class PlayerInteractionNet : NetworkBehaviour
         }
         catch { }
 
-        TrashItem trashItem = obj.GetComponent<TrashItem>();
-        if (trashItem != null)
-        {
-            trashItem.OnPickedUp();
-        }
-
         interactable.StartCoroutine(interactable.DespawnAfterDelay(targetId, 0.3f));
     }
 
-    private void TrySpawnTrash()
+    // 스폰 위치 계산 (회전 전 카메라 정보 사용)
+    private Vector3 CalculateSpawnPosition(Vector3 camPos, Vector3 camForward)
     {
-        if (trashPrefabs == null || trashPrefabs.Length == 0) return;
-        if (_cam == null) return;
-
-        if (_player != null)
-            _player.RotateToCameraDirection();
-
-        int pick = Random.Range(0, trashPrefabs.Length);
-        Vector3 camPos = _cam.transform.position;
-        Vector3 camForward = _cam.transform.forward;
-
-        RPC_RequestSpawnTrash(pick, camPos, camForward);
+        Ray ray = new Ray(camPos, camForward);
+        
+        if (Physics.Raycast(ray, out RaycastHit hit, spawnRayDistance, trashGroundMask))
+        {
+            return hit.point;
+        }
+        else
+        {
+            return ray.GetPoint(2.0f);
+        }
     }
 
+    // ★ [수정됨] 카메라가 바라보는 바닥 지점을 계산하여 생성 요청
+    // 회전 전 카메라 정보를 파라미터로 받아서 사용
+    private void TrySpawnTrash(Vector3 camPos, Vector3 camForward, float camY)
+    {
+        if (trashPrefabs == null || trashPrefabs.Length == 0) return;
+
+        int pick = Random.Range(0, trashPrefabs.Length);
+
+        // ★ [수정] 오프셋 제거! 카메라 위치(눈)에서 정확히 시작합니다.
+        // 이제 화면 중앙(크로스헤어)과 레이저가 100% 일치합니다.
+        Ray ray = new Ray(camPos, camForward);
+
+        Vector3 spawnPos;
+
+        // 디버그 업데이트
+        _debugRayStart = ray.origin;
+        _debugRayDir = ray.direction;
+
+        // ★ [수정] UpdateGizmoPreview()와 동일한 로직 사용
+        if (Physics.Raycast(ray, out RaycastHit hit, spawnRayDistance, trashGroundMask))
+        {
+            spawnPos = hit.point;
+            _debugHit = true;
+            _debugHitPoint = hit.point;
+        }
+        else
+        {
+            // 허공일 때
+            spawnPos = ray.GetPoint(2.0f);
+            _debugHit = false;
+        }
+
+        // 회전: 저장해둔 회전 전 카메라 Y축 방향 사용
+        Quaternion spawnRot = Quaternion.Euler(0f, camY, 0f);
+
+        RPC_RequestSpawnTrash(pick, spawnPos, spawnRot);
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (!showGizmos) return;
+        if (_cam == null) return; // 카메라 없으면 패스
+
+        // 1. 레이저 (노란색)
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(_debugRayStart, _debugRayDir * spawnRayDistance);
+
+        // 2. 예상 생성 지점
+        if (_debugHit)
+        {
+            // 바닥에 닿았을 때: 초록색 구
+            Gizmos.color = Color.green;
+            Gizmos.DrawSphere(_debugPos, 0.2f);
+        }
+        else
+        {
+            // 허공일 때: 빨간색 와이어 구
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(_debugPos, 0.2f);
+        }
+
+        // 3. 예상 회전 방향 (파란색 선 = 앞)
+        Gizmos.color = Color.blue;
+        Vector3 forwardDir = _debugRot * Vector3.forward;
+        Gizmos.DrawLine(_debugPos, _debugPos + forwardDir * 1.0f);
+
+        // 화살표 머리 살짝 표시 (선택)
+        Gizmos.DrawRay(_debugPos + forwardDir * 1.0f, (_debugRot * new Vector3(-0.2f, 0, -0.2f)));
+        Gizmos.DrawRay(_debugPos + forwardDir * 1.0f, (_debugRot * new Vector3(0.2f, 0, -0.2f)));
+    }
+
+    // ★ [수정됨] 위치를 서버에서 계산하지 않고 클라이언트가 준 정확한 위치 사용
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
-    private void RPC_RequestSpawnTrash(int prefabIndex, Vector3 cameraPosition, Vector3 cameraForward, RpcInfo _ = default)
+    private void RPC_RequestSpawnTrash(int prefabIndex, Vector3 finalPos, Quaternion finalRot, RpcInfo _ = default)
     {
         if (_equip != null && _equip.Equipped != EquipmentId.TrashThrow) return;
-
         if (trashPrefabs == null || trashPrefabs.Length == 0) return;
         if (prefabIndex < 0 || prefabIndex >= trashPrefabs.Length) return;
 
         var prefab = trashPrefabs[prefabIndex];
         if (prefab == null) return;
 
-        Vector3 camForwardFlat = cameraForward;
-        camForwardFlat.y = 0f;
-        camForwardFlat.Normalize();
-
-        Vector3 origin = cameraPosition
-                       + camForwardFlat * trashForwardOffset
-                       + Vector3.up * trashDropHeight;
-
-        Vector3 spawnPos = origin;
-        if (Physics.Raycast(origin, Vector3.down, out var hit, 5f, trashGroundMask, QueryTriggerInteraction.Ignore))
-            spawnPos = hit.point + Vector3.up * 0.02f;
-
-        // 카메라 방향 회전 적용
-        Quaternion rot = Quaternion.LookRotation(camForwardFlat);
-
         if (_player != null)
             _player.LockMovementForPickup(1.5f);
 
         _animator.SetTrigger("pickTrigger");
-        var spawnedObj = Runner.Spawn(prefab, spawnPos, rot, Object.InputAuthority);
-        
-        // 스폰한 쓰레기에 스폰한 플레이어 정보 저장
+
+        // 클라이언트가 계산해준 위치(finalPos)와 회전(finalRot) 그대로 사용
+        var spawnedObj = Runner.Spawn(prefab, finalPos, finalRot, Object.InputAuthority);
+
         if (spawnedObj != null)
         {
+            // ★ 생성된 쓰레기 위치로 플레이어 회전 (서버에서도 회전 - 클라이언트는 이미 회전함)
+            if (_player != null)
+            {
+                _player.RotateToPosition(finalPos);
+            }
+
             var interactable = spawnedObj.GetComponent<Interactable>();
             if (interactable != null)
             {
                 interactable.SetSpawnedByPlayer(Object.InputAuthority);
             }
         }
-
-        var trashItem = spawnedObj.GetComponent<TrashItem>();
-        if (trashItem != null)
-        {
-            // 이 함수는 Start()와 달리, 여기서 명시적으로 호출할 때만 실행됩니다.
-            //trashItem.OnSpawn();
-        }
     }
 
     private void TryAwardGameCore_Server(Vector3 worldPos, Quaternion worldRot, RpcInfo info, bool isDefaultTrash)
     {
         if (!Object || !Object.HasStateAuthority) return;
-        
-        // 방해자(Imposter)일 때만 게임 코어 획득 가능
-        if (_player == null || _player.Role != PlayerRole.Imposter)
-        {
-            return;
-        }
-        
-        // 기본 쓰레기(라운드 시작 시 존재)만 코어 드랍 가능
-        // 플레이어가 스폰한 쓰레기는 코어 드랍 안 함
-        if (!isDefaultTrash)
-        {
-            return;
-        }
+        if (_player == null || _player.Role != PlayerRole.Imposter) return;
+        if (!isDefaultTrash) return;
 
         if (UnityEngine.Random.value > gameCoreSpawnChance) return;
 
         RPC_ShowGameCoreToOwner(gameCoreShowSeconds);
-        Debug.Log("Game Core Spawned");
-
         RPC_ShowGameCoreVisualAtAll(worldPos, worldRot, gameCoreShowSeconds);
 
         if (GameRuleManager.Instance != null)
@@ -431,9 +513,6 @@ public class PlayerInteractionNet : NetworkBehaviour
             go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.transform.SetPositionAndRotation(spawnPos, worldRot);
             go.transform.localScale = Vector3.one * 0.3f;
-
-            var col = go.GetComponent<Collider>();
-            if (col) col.enabled = false;
         }
 
         if (go != null)
