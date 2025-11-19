@@ -79,7 +79,7 @@ public class MeetingDirector : NetworkBehaviour
     private bool _wasLive = false;
     private bool _cleanerWinAnnounced = false;
     private Coroutine _resultPanelCoroutine;
-    private bool _isShowingResult = false; 
+    public bool _isShowingResult = false; 
 
 
     private bool IsGameLiveNow()
@@ -271,6 +271,10 @@ public class MeetingDirector : NetworkBehaviour
         FreezeLocalOwnedCharacter(false);
         if (meetingUI) meetingUI.SetActive(false);
 
+        // ⭐ 모든 회의 관련 UI 강제 숨김
+        if (meetingUI) meetingUI.SetActive(false);
+        if (voteUI) voteUI.gameObject.SetActive(false); // VoteUI도 숨김
+
         var accusedRef = PlayerRefFromId(accusedPlayerId);
         var accusedName = GetPlayerDisplayName(accusedRef);
 
@@ -320,7 +324,9 @@ public class MeetingDirector : NetworkBehaviour
         _meetingOnCached = false;
         SetRoundTimerVisible(true);
 
+        // ⭐ 모든 회의 관련 UI 강제 숨김
         if (meetingUI) meetingUI.SetActive(false);
+        if (voteUI) voteUI.gameObject.SetActive(false); // VoteUI도 숨김
 
         var me = GetLocalPlayerInfo();
         bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
@@ -375,6 +381,12 @@ public class MeetingDirector : NetworkBehaviour
         var me = GetLocalPlayerInfo();
         bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
 
+        HideFinalVoteBanner();
+        if (meetingUI) meetingUI.SetActive(false);
+        if (voteUI) voteUI.gameObject.SetActive(false);
+
+        _meetingOnCached = false;
+
         // 결과 패널 표시
         string title = iAmSaboteur ? "방해자 성공!" : "방해자 승리…";
         string detail = "게임코어 3개를 모두 획득했습니다.";
@@ -421,6 +433,10 @@ public class MeetingDirector : NetworkBehaviour
     {
         var me = GetLocalPlayerInfo();
         bool iAmSaboteur = me && me.PlayerRole == PlayerInfo.Role.Saboteur;
+
+        HideFinalVoteBanner();
+        if (meetingUI) meetingUI.SetActive(false);
+        if (voteUI) voteUI.gameObject.SetActive(false);
 
         var brain = Camera.main?.GetComponent<Cinemachine.CinemachineBrain>();
         if (brain != null)

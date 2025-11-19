@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
@@ -9,63 +9,63 @@ using System;
 using TMPro;
 
 /// <summary>
-/// µÎ ´Ü°è ÇÃ·Î¿ì:
-/// 1) Å¸°Ù(ÇÃ·¹ÀÌ¾î) ¼±ÅÃ ÆĞ³Î ¸ÕÀú Ç¥½Ã (K·Î ¼øÈ¯, Enter·Î È®Á¤)
-/// 2) Á¦Àç(ÆĞ³ÎÆ¼) ¼±ÅÃ ÆĞ³Î ½½¶óÀÌµå ÀÎ (K·Î ¼øÈ¯, Enter·Î È®Á¤)
-/// ¸ğµç ÇÃ·¹ÀÌ¾î°¡ ¼±ÅÃ ¿Ï·á or Å¸ÀÌ¸Ó Á¾·á ½Ã ÀÏ°ı Àû¿ë
+/// ë‘ ë‹¨ê³„ í”Œë¡œìš°:
+/// 1) íƒ€ê²Ÿ(í”Œë ˆì´ì–´) ì„ íƒ íŒ¨ë„ ë¨¼ì € í‘œì‹œ (Kë¡œ ìˆœí™˜, Enterë¡œ í™•ì •)
+/// 2) ì œì¬(íŒ¨ë„í‹°) ì„ íƒ íŒ¨ë„ ìŠ¬ë¼ì´ë“œ ì¸ (Kë¡œ ìˆœí™˜, Enterë¡œ í™•ì •)
+/// ëª¨ë“  í”Œë ˆì´ì–´ê°€ ì„ íƒ ì™„ë£Œ or íƒ€ì´ë¨¸ ì¢…ë£Œ ì‹œ ì¼ê´„ ì ìš©
 /// </summary>
 public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 {
-    // ===================== Å×½ºÆ®/ÀÏ¹İ ¿É¼Ç =====================
-    [Header("Å×½ºÆ® ¿É¼Ç")]
+    // ===================== í…ŒìŠ¤íŠ¸/ì¼ë°˜ ì˜µì…˜ =====================
+    [Header("í…ŒìŠ¤íŠ¸ ì˜µì…˜")]
     [SerializeField] private bool allowSelfTargetForTest = false;
 
-    [Header("ÆĞ³Î ¿ÀÇÂ °£°İ (È£½ºÆ® ½ºÄÉÁÙ)")]
-    public float interval = 300f; // ÃÊ
+    [Header("íŒ¨ë„ ì˜¤í”ˆ ê°„ê²© (í˜¸ìŠ¤íŠ¸ ìŠ¤ì¼€ì¤„)")]
+    public float interval = 300f; // ì´ˆ
 
-    [Header("È¸ÀÇ Áß ¿É¼Ç ÆĞ³Î Â÷´Ü")]
+    [Header("íšŒì˜ ì¤‘ ì˜µì…˜ íŒ¨ë„ ì°¨ë‹¨")]
     [SerializeField] private bool suppressDuringMeeting = true;
 
-    private MeetingDirector _meeting;   // È¸ÀÇ »óÅÂ ÂüÁ¶
+    private MeetingDirector _meeting;   // íšŒì˜ ìƒíƒœ ì°¸ì¡°
 
-    // ===================== Á¦Àç ÆĞ³Î(±âÁ¸) =====================
-    [Header("Á¦Àç ÆĞ³Î ½½¶óÀÌµå")]
-    public RectTransform slideTarget;   // Á¦Àç ¼±ÅÃ ÆĞ³Î ·çÆ®(RectTransform)
+    // ===================== ì œì¬ íŒ¨ë„(ê¸°ì¡´) =====================
+    [Header("ì œì¬ íŒ¨ë„ ìŠ¬ë¼ì´ë“œ")]
+    public RectTransform slideTarget;   // ì œì¬ ì„ íƒ íŒ¨ë„ ë£¨íŠ¸(RectTransform)
     public float slideInY = 0f;
     public float slideOutY = -300f;
     public float slideDur = 0.5f;
 
-    [Header("Á¦Àç ÆĞ³Î Å¸ÀÌ¸Ó(¿¬Ãâ¿ë)")]
-    public Image timerBar;              // Á¦Àç ÆĞ³Î »ó´Ü Å¸ÀÌ¸Ó ¹Ù(¼±ÅÃ)
+    [Header("ì œì¬ íŒ¨ë„ íƒ€ì´ë¨¸(ì—°ì¶œìš©)")]
+    public Image timerBar;              // ì œì¬ íŒ¨ë„ ìƒë‹¨ íƒ€ì´ë¨¸ ë°”(ì„ íƒ)
     public float timeLimit = 20f;
 
-    [Header("Á¦Àç Ç×¸ñ(¹öÆ° ÀÌ¹ÌÁöµé)")]
+    [Header("ì œì¬ í•­ëª©(ë²„íŠ¼ ì´ë¯¸ì§€ë“¤)")]
     public List<Image> buttonImages;
     public Color normalColor = Color.white;
     public Color highlightColor = new Color(1f, 0.8f, 0.3f, 1f);
     public float colorTweenDur = 0.2f;
 
-    [Header("½½¶óÀÌµå ¿¬µ¿ ÅØ½ºÆ®(¼±ÅÃ)")]
-    [SerializeField] private GameObject slideTextGO; // ¿¹: Å¬¸° °ÔÀÌÁö ÅØ½ºÆ®
+    [Header("ìŠ¬ë¼ì´ë“œ ì—°ë™ í…ìŠ¤íŠ¸(ì„ íƒ)")]
+    [SerializeField] private GameObject slideTextGO; // ì˜ˆ: í´ë¦° ê²Œì´ì§€ í…ìŠ¤íŠ¸
 
-    [Header("Å¸°Ù Ç¥½Ã(¼±ÅÃ)")]
-    public Text targetLabel; // ¼±ÅÃµÈ Å¸°Ù Ç¥±â¿ë(¼±ÅÃ)
+    [Header("íƒ€ê²Ÿ í‘œì‹œ(ì„ íƒ)")]
+    public Text targetLabel; // ì„ íƒëœ íƒ€ê²Ÿ í‘œê¸°ìš©(ì„ íƒ)
 
-    [Header("ÆĞ³ÎÆ¼ ±â´É")]
-    public Image tunnelVisionMask;  // ÅÍ³Î ºñÀü¿ë ¸¶½ºÅ© ÀÌ¹ÌÁö(Å¸°Ù º»ÀÎ¸¸ on/off)
+    [Header("íŒ¨ë„í‹° ê¸°ëŠ¥")]
+    public Image tunnelVisionMask;  // í„°ë„ ë¹„ì „ìš© ë§ˆìŠ¤í¬ ì´ë¯¸ì§€(íƒ€ê²Ÿ ë³¸ì¸ë§Œ on/off)
 
-    // ===================== Å¸°Ù ¼±ÅÃ ÆĞ³Î(½Å±Ô) =====================
-    [Header("Å¸°Ù ¼±ÅÃ ¾È³» ÅØ½ºÆ®")]
+    // ===================== íƒ€ê²Ÿ ì„ íƒ íŒ¨ë„(ì‹ ê·œ) =====================
+    [Header("íƒ€ê²Ÿ ì„ íƒ ì•ˆë‚´ í…ìŠ¤íŠ¸")]
     [SerializeField] private TMP_Text targetTitleText;
-    [SerializeField] private string targetTitleMessage = "Á¦ÀçÇÒ ÇÃ·¹ÀÌ¾î¸¦ ¼±ÅÃÇÏ¼¼¿ä";
+    [SerializeField] private string targetTitleMessage = "ì œì¬í•  í”Œë ˆì´ì–´ë¥¼ ì„ íƒí•˜ì„¸ìš”";
 
-    [Header("Å¸°Ù ¼±ÅÃ ÆĞ³Î (ÇÃ·¹ÀÌ¾î ÀÌ¸§ ¸®½ºÆ®)")]
-    [SerializeField] private GameObject targetPanelRoot;   // ºñÈ°¼º ½ÃÀÛ
+    [Header("íƒ€ê²Ÿ ì„ íƒ íŒ¨ë„ (í”Œë ˆì´ì–´ ì´ë¦„ ë¦¬ìŠ¤íŠ¸)")]
+    [SerializeField] private GameObject targetPanelRoot;   // ë¹„í™œì„± ì‹œì‘
     [SerializeField] private RectTransform targetContent;  // ScrollRect/Viewport/Content
     [SerializeField] private GameObject targetItemPrefab;  // Image(bg) + TMP_Text("Label")
-    [SerializeField] private ScrollRect targetScroll;      // (¼±ÅÃ) ÀÚµ¿ ½ºÅ©·Ñ
+    [SerializeField] private ScrollRect targetScroll;      // (ì„ íƒ) ìë™ ìŠ¤í¬ë¡¤
 
-    [Header("Å¸°Ù Ç×¸ñ »ö/¿¬Ãâ")]
+    [Header("íƒ€ê²Ÿ í•­ëª© ìƒ‰/ì—°ì¶œ")]
     [SerializeField] private Color targetBgNormal = new Color(0f, 0f, 0f, 0.5f);
     [SerializeField] private Color targetBgSelected = new Color(0.15f, 0.35f, 1f, 0.7f);
     [SerializeField] private float targetColorTween = 0.15f;
@@ -73,7 +73,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     [SerializeField] private float targetPulseScale = 1.03f;
     [SerializeField] private float targetPulseDur = 0.35f;
 
-    // Å¸°Ù Ç×¸ñ ³»ºÎ ±¸Á¶
+    // íƒ€ê²Ÿ í•­ëª© ë‚´ë¶€ êµ¬ì¡°
     private class TargetItem
     {
         public GameObject go;
@@ -85,14 +85,14 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     }
     private readonly List<TargetItem> _targetItems = new();
 
-    // ===================== ³×Æ®¿öÅ© µ¿±âÈ­ =====================
+    // ===================== ë„¤íŠ¸ì›Œí¬ ë™ê¸°í™” =====================
     [Networked] private TickTimer NextOpenTimer { get; set; }
 
-    // ÆĞ³ÎÆ¼ ÅõÇ¥ °á°ú ÀúÀå (¼­¹ö°¡ °ü¸®)
+    // íŒ¨ë„í‹° íˆ¬í‘œ ê²°ê³¼ ì €ì¥ (ì„œë²„ê°€ ê´€ë¦¬)
     [Networked, Capacity(16)]
     private NetworkDictionary<PlayerRef, PenaltyVote> PenaltyVotes => default;
 
-    // ÆĞ³ÎÆ¼ ÅõÇ¥ µ¥ÀÌÅÍ ±¸Á¶Ã¼
+    // íŒ¨ë„í‹° íˆ¬í‘œ ë°ì´í„° êµ¬ì¡°ì²´
     private struct PenaltyVote : INetworkStruct
     {
         public PlayerRef target;
@@ -100,20 +100,20 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         public NetworkBool hasVoted;
     }
 
-    // ===================== ·ÎÄÃ »óÅÂ =====================
+    // ===================== ë¡œì»¬ ìƒíƒœ =====================
     private enum Phase { Closed, ChoosingTarget, ChoosingPenalty, WaitingForOthers }
     private Phase _phase = Phase.Closed;
 
-    private float _localPanelTimer;         // ÆĞ³Î(ÇöÀç ´Ü°è) ³²Àº ½Ã°£(¿¬Ãâ)
-    private List<PlayerRef> _targets = new List<PlayerRef>(); // ÈÄº¸
-    private int _targetIndex = -1;          // Å¸°Ù ÀÎµ¦½º
-    private int _penaltyIndex = 0;          // Á¦Àç ÀÎµ¦½º
+    private float _localPanelTimer;         // íŒ¨ë„(í˜„ì¬ ë‹¨ê³„) ë‚¨ì€ ì‹œê°„(ì—°ì¶œ)
+    private List<PlayerRef> _targets = new List<PlayerRef>(); // í›„ë³´
+    private int _targetIndex = -1;          // íƒ€ê²Ÿ ì¸ë±ìŠ¤
+    private int _penaltyIndex = 0;          // ì œì¬ ì¸ë±ìŠ¤
 
-    [Header("´ë±â »óÅÂ UI")]
-    [SerializeField] private GameObject waitingPanel; // "´Ù¸¥ ÇÃ·¹ÀÌ¾î¸¦ ±â´Ù¸®´Â Áß..." Ç¥½Ã¿ë
+    [Header("ëŒ€ê¸° ìƒíƒœ UI")]
+    [SerializeField] private GameObject waitingPanel; // "ë‹¤ë¥¸ í”Œë ˆì´ì–´ë¥¼ ê¸°ë‹¤ë¦¬ëŠ” ì¤‘..." í‘œì‹œìš©
     [SerializeField] private TMP_Text waitingText;
 
-    // ===================== ¶óÀÌÇÁ»çÀÌÅ¬ =====================
+    // ===================== ë¼ì´í”„ì‚¬ì´í´ =====================
     void Start()
     {
         _meeting = FindObjectOfType<MeetingDirector>(true);
@@ -181,7 +181,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
             _wasLive = true;
 
-            // Å¸ÀÌ¸Ó Á¾·á ½Ã ÆĞ³ÎÆ¼ ÀÏ°ı Àû¿ë
+            // íƒ€ì´ë¨¸ ì¢…ë£Œ ì‹œ íŒ¨ë„í‹° ì¼ê´„ ì ìš©
             if (_phase != Phase.Closed && _localPanelTimer <= 0f)
             {
                 ApplyAllPenalties();
@@ -196,6 +196,27 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         bool live = IsGameLive();
 
+        if (_meeting != null)
+        {
+            bool shouldClose = false;
+
+            if (suppressDuringMeeting && _meeting.IsMeetingOn)
+                shouldClose = true;
+
+            // â­ ê²°ê³¼ ì—°ì¶œ ì¤‘ ì²´í¬
+            if (_meeting._isShowingResult)
+                shouldClose = true;
+
+            if (shouldClose && _phase != Phase.Closed)
+            {
+                if (Object.HasStateAuthority)
+                    RpcClosePanel();
+                else
+                    LocalClosePanelVisual();
+                return;
+            }
+        }
+
         if (suppressDuringMeeting && _meeting && _meeting.IsMeetingOn && _phase != Phase.Closed)
         {
             RpcClosePanel();
@@ -208,14 +229,14 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             return;
         }
 
-        // ÆĞ³Î Å¸ÀÌ¸Ó
+        // íŒ¨ë„ íƒ€ì´ë¨¸
         if (_phase == Phase.ChoosingTarget || _phase == Phase.ChoosingPenalty || _phase == Phase.WaitingForOthers)
         {
             _localPanelTimer -= Time.deltaTime;
             if (timerBar) timerBar.fillAmount = Mathf.Clamp01(_localPanelTimer / timeLimit);
         }
 
-        // K/Enter ¹ÙÀÎµù
+        // K/Enter ë°”ì¸ë”©
         if (_phase == Phase.ChoosingTarget)
         {
             if (Input.GetKeyDown(KeyCode.K))
@@ -239,23 +260,23 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
                 if (_targetIndex >= 0 && _targetIndex < _targets.Count)
                 {
                     var target = _targets[_targetIndex];
-                    // ¼­¹ö¿¡ ÅõÇ¥ Á¦Ãâ
+                    // ì„œë²„ì— íˆ¬í‘œ ì œì¶œ
                     RPC_SubmitPenaltyVote(target, _penaltyIndex);
 
-                    // ´ë±â »óÅÂ·Î ÀüÈ¯
+                    // ëŒ€ê¸° ìƒíƒœë¡œ ì „í™˜
                     EnterWaitingPhase();
                 }
             }
         }
     }
 
-    // ===================== ÆĞ³Î ¿­¸²/´İÈû (RPC) =====================
+    // ===================== íŒ¨ë„ ì—´ë¦¼/ë‹«í˜ (RPC) =====================
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RpcOpenPanel()
     {
         if (!IsGameLive()) return;
 
-        // ¼­¹ö: ÅõÇ¥ µñ¼Å³Ê¸® ÃÊ±âÈ­
+        // ì„œë²„: íˆ¬í‘œ ë”•ì…”ë„ˆë¦¬ ì´ˆê¸°í™”
         if (Object.HasStateAuthority)
         {
             PenaltyVotes.Clear();
@@ -348,19 +369,19 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         _phase = Phase.WaitingForOthers;
 
-        // Á¦Àç ÆĞ³Î ¼û±è
+        // ì œì¬ íŒ¨ë„ ìˆ¨ê¹€
         if (slideTarget)
         {
             slideTarget.DOKill();
             slideTarget.DOAnchorPosY(slideOutY, slideDur).SetEase(Ease.InBack);
         }
 
-        // ´ë±â ÆĞ³Î Ç¥½Ã
+        // ëŒ€ê¸° íŒ¨ë„ í‘œì‹œ
         if (waitingPanel) waitingPanel.SetActive(true);
-        if (waitingText) waitingText.text = "´Ù¸¥ ÇÃ·¹ÀÌ¾î¸¦ ±â´Ù¸®´Â Áß...";
+        if (waitingText) waitingText.text = "ë‹¤ë¥¸ í”Œë ˆì´ì–´ë¥¼ ê¸°ë‹¤ë¦¬ëŠ” ì¤‘...";
     }
 
-    // ===================== ÆĞ³ÎÆ¼ ÅõÇ¥ Á¦Ãâ ¹× Ã³¸® =====================
+    // ===================== íŒ¨ë„í‹° íˆ¬í‘œ ì œì¶œ ë° ì²˜ë¦¬ =====================
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RPC_SubmitPenaltyVote(PlayerRef target, int penaltyIndex, RpcInfo info = default)
     {
@@ -368,7 +389,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         var voter = info.Source;
 
-        // ÅõÇ¥ ÀúÀå
+        // íˆ¬í‘œ ì €ì¥
         PenaltyVotes.Set(voter, new PenaltyVote
         {
             target = target,
@@ -378,7 +399,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
 
         Debug.Log($"[Server] {voter} voted: target={target}, penalty={penaltyIndex}");
 
-        // ¸ğµç ÇÃ·¹ÀÌ¾î°¡ ÅõÇ¥Çß´ÂÁö È®ÀÎ
+        // ëª¨ë“  í”Œë ˆì´ì–´ê°€ íˆ¬í‘œí–ˆëŠ”ì§€ í™•ì¸
         if (CheckAllPlayersVoted())
         {
             Debug.Log("[Server] All players voted! Applying penalties...");
@@ -404,7 +425,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         if (!Object.HasStateAuthority) return;
 
-        // °¢ Å¸°Ùº°·Î ¹ŞÀº ÆĞ³ÎÆ¼ ¼öÁı
+        // ê° íƒ€ê²Ÿë³„ë¡œ ë°›ì€ íŒ¨ë„í‹° ìˆ˜ì§‘
         Dictionary<PlayerRef, List<int>> targetPenalties = new Dictionary<PlayerRef, List<int>>();
 
         foreach (var kvp in PenaltyVotes)
@@ -419,26 +440,26 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
             targetPenalties[vote.target].Add(vote.penaltyIndex);
         }
 
-        // °¢ Å¸°Ù¿¡°Ô ÆĞ³ÎÆ¼ ÀÏ°ı Àû¿ë
+        // ê° íƒ€ê²Ÿì—ê²Œ íŒ¨ë„í‹° ì¼ê´„ ì ìš©
         foreach (var kvp in targetPenalties)
         {
             var target = kvp.Key;
             var penalties = kvp.Value;
 
-            // °¡Àå ¸¹ÀÌ ¹ŞÀº ÆĞ³ÎÆ¼ or Ã¹ ¹øÂ° ÆĞ³ÎÆ¼ Àû¿ë
-            // (¿©·¯ ÆĞ³ÎÆ¼¸¦ µ¿½Ã Àû¿ëÇÏ·Á¸é foreach·Î ¸ğµÎ Àû¿ë °¡´É)
+            // ê°€ì¥ ë§ì´ ë°›ì€ íŒ¨ë„í‹° or ì²« ë²ˆì§¸ íŒ¨ë„í‹° ì ìš©
+            // (ì—¬ëŸ¬ íŒ¨ë„í‹°ë¥¼ ë™ì‹œ ì ìš©í•˜ë ¤ë©´ foreachë¡œ ëª¨ë‘ ì ìš© ê°€ëŠ¥)
             if (penalties.Count > 0)
             {
-                int selectedPenalty = penalties[0]; // ¶Ç´Â ÅõÇ¥¼ö·Î °áÁ¤
+                int selectedPenalty = penalties[0]; // ë˜ëŠ” íˆ¬í‘œìˆ˜ë¡œ ê²°ì •
                 RPC_ApplyPenaltyToTarget(target, selectedPenalty);
             }
         }
 
-        // ÅõÇ¥ ÃÊ±âÈ­
+        // íˆ¬í‘œ ì´ˆê¸°í™”
         PenaltyVotes.Clear();
     }
 
-    // ===================== Å¸°Ù ¸ñ·Ï/¸®½ºÆ® UI =====================
+    // ===================== íƒ€ê²Ÿ ëª©ë¡/ë¦¬ìŠ¤íŠ¸ UI =====================
     private void BuildTargetList()
     {
         _targets.Clear();
@@ -607,7 +628,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    // ===================== Á¦Àç ¼±ÅÃ UI =====================
+    // ===================== ì œì¬ ì„ íƒ UI =====================
     private void CyclePenalty()
     {
         if (buttonImages == null || buttonImages.Count == 0) return;
@@ -630,11 +651,11 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    // ===================== RPC: ÆĞ³ÎÆ¼ Àû¿ë (Å¸°Ù º»ÀÎ¸¸ ·ÎÄÃ Àû¿ë) =====================
+    // ===================== RPC: íŒ¨ë„í‹° ì ìš© (íƒ€ê²Ÿ ë³¸ì¸ë§Œ ë¡œì»¬ ì ìš©) =====================
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_ApplyPenaltyToTarget(PlayerRef target, int penaltyIndex)
     {
-        // Å¸°Ù º»ÀÎ Å¬¶óÀÌ¾ğÆ®¸¸ Àû¿ë
+        // íƒ€ê²Ÿ ë³¸ì¸ í´ë¼ì´ì–¸íŠ¸ë§Œ ì ìš©
         if (Runner && Runner.LocalPlayer == target)
         {
             ApplyPenaltyLocal(penaltyIndex);
@@ -659,15 +680,15 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     {
         float dur = 5f;
 
-        // ³» Player ÄÄÆ÷³ÍÆ® Ã£±â
-        NewPlayerController localPlayer = FindLocalPlayerController(); // ÀÌ°Í¸¸ ¹Ù²Ù¸é µÊ
+        // ë‚´ Player ì»´í¬ë„ŒíŠ¸ ì°¾ê¸°
+        NewPlayerController localPlayer = FindLocalPlayerController(); // ì´ê²ƒë§Œ ë°”ê¾¸ë©´ ë¨
 
-        // Debuff HUD Ã£±â
+        // Debuff HUD ì°¾ê¸°
         var ui = FindObjectOfType<DebuffUI>(true);
 
         switch (optionIndex)
         {
-            case 0: // ÀÌµ¿¼Óµµ Á¦ÇÑ
+            case 0: // ì´ë™ì†ë„ ì œí•œ
                 if (localPlayer)
                 {
                     localPlayer.SetSpeedLimit(true);
@@ -676,12 +697,12 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
                 if (ui) ui.Show(DebuffType.SpeedLimit, dur);
                 break;
 
-            case 1: // ¹«À½
+            case 1: // ë¬´ìŒ
                 StartCoroutine(MuteSoundFor(dur));
                 if (ui) ui.Show(DebuffType.Mute, dur);
                 break;
 
-            case 2: // ÅÍ³Î ºñÀü
+            case 2: // í„°ë„ ë¹„ì „
                 if (tunnelVisionMask)
                 {
                     tunnelVisionMask.gameObject.SetActive(true);
@@ -690,7 +711,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
                 if (ui) ui.Show(DebuffType.TunnelVision, dur);
                 break;
 
-            case 3: // UI Àá±İ
+            case 3: // UI ì ê¸ˆ
                 {
                     var equip = FindObjectOfType<EquipmentManager>(true);
                     if (equip) equip.LockUI(dur);
@@ -703,7 +724,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         }
     }
 
-    // ·ÎÄÃ ÇÃ·¹ÀÌ¾î Ã£±â (ÀÔ·Â ±ÇÇÑ º¸À¯ÇÑ Player)
+    // ë¡œì»¬ í”Œë ˆì´ì–´ ì°¾ê¸° (ì…ë ¥ ê¶Œí•œ ë³´ìœ í•œ Player)
     private Player FindLocalPlayer()
     {
         var allPlayers = FindObjectsOfType<Player>(true);
@@ -718,7 +739,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
         return null;
     }
 
-    // ===================== ÄÚ·çÆ¾ =====================
+    // ===================== ì½”ë£¨í‹´ =====================
     IEnumerator ReleaseSpeedLimitAfter(NewPlayerController player, float sec)
     {
         yield return new WaitForSeconds(sec);
@@ -799,7 +820,7 @@ public class OptionButtonUI : NetworkBehaviour, INetworkRunnerCallbacks
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
 
-    // ===================== ·ÎÄÃ À¯Æ¿/º¸°­ =====================
+    // ===================== ë¡œì»¬ ìœ í‹¸/ë³´ê°• =====================
     private string ResolvePlayerName(PlayerRef pref)
     {
         if (Runner != null && Runner.TryGetPlayerObject(pref, out var obj) && obj != null)
